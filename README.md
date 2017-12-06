@@ -14,9 +14,11 @@ Serving HTTP on 0.0.0.0 port 8000 ...
 
 
 Media Info
+
 curl -i http://localhost:8000/cgi-bin/cube.py?file=Robotica.json
 
 MP4 Download
+
 wget -O Robotica.mp4 http://localhost:8000/cgi-bin/cube.py?file=Robotica.mp4
 
 Nginx Proxy
