@@ -9,8 +9,8 @@ cd cube
 python -m CGIHTTPServer 8000 .
 
 root@linux-01:/data/cube> python -m CGIHTTPServer 8000 .
+
 Serving HTTP on 0.0.0.0 port 8000 ...
-localhost.localdomain - - [07/Dec/2017 02:01:59] "GET /cgi-bin/cube.py?file=Robotica.json HTTP/1.0" 200 -
 
 
 Media Info
