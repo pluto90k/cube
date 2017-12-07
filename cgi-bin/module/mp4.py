@@ -34,7 +34,12 @@ class MP4(object):
 		elif name == 'mvhd': out = self._mvhd(data)
 		elif name == 'trak': out = self._trak(data)
 		elif name == 'mdia': out = self._media(data)
+		elif name == 'mdhd': out = self._mdhd(data)
 		elif name == 'minf': out = self._minf(data)
+		elif name == 'hdlr': out = self._hdlr(data)
+		elif name == 'vmhd': out = self._vmhd(data)
+		elif name == 'dinf': out = self._dinf(data)
+		elif name == 'dref': out = self._dref(data)
 		elif name == 'stbl': out = self._stbl(data)
 		elif name == 'stts': out = self._stts(data)
 		elif name == 'stsd': out = self._stsd(data)
@@ -81,23 +86,59 @@ class MP4(object):
 		bio = BytesIO(mvhd) 
 		dic = {
 			'version':int(bio.read(1).encode('hex'), 16),
-			'flag':bio.read(3).encode('hex'),
-			'create_time':time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(int(bio.read(4).encode('hex'), 16)))
+			'flag':int(bio.read(3).encode('hex'), 16)
 		}
-		bio.read(4)
-		bio.read(4)
-		dic['duration'] =int(bio.read(4).encode('hex'), 16) 
+		
+		s = 8 if dic['version'] else 4
+		dic['create_time']=time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(int(bio.read(s).encode('hex'), 16)))
+		dic['modification_time']=time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(int(bio.read(s).encode('hex'), 16)))
+		dic['timescale']=int(bio.read(s).encode('hex'), 16) 
+		dic['duration']=int(bio.read(s).encode('hex'), 16) 
+
+		#Reserved
+		bio.read(4) 
+		bio.read(2) 
+		bio.read(2) 
+		bio.read(8) 
+		bio.read(4 * 9) 
+		bio.read(4 * 6)
+		#--Reserved
+
+		#A 32-bit integer that indicates a value to use for the track ID number of the next track added to this movie. Note that 0 is not a valid track ID value.
+		dic['next-track-id'] = int(bio.read(4).encode('hex'), 16)
 		bio.close()
 		return dic
 
+	def _tkhd(self, tkhd):
+		bio = BytesIO(tkhd) 
+		dic = {}
+		head = bio.read(4).decode('utf-8')
+		dic[head] = {
+			'version':int(bio.read(1).encode('hex'), 16),
+			'flag':int(bio.read(3).encode('hex'), 16)
+		}
+
+		s = 8 if dic[head]['version'] else 4
+		dic[head]['create_time']=time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(int(bio.read(s).encode('hex'), 16)))
+		dic[head]['modification_time']=time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(int(bio.read(s).encode('hex'), 16)))
+		dic[head]['track-id'] = int(bio.read(4).encode('hex'), 16)
+		bio.read(4)
+		dic[head]['duration']=int(bio.read(4).encode('hex'), 16)
+		bio.read(4 * 3)
+		bio.read(2)
+		bio.read(2)
+		bio.read(4 * 9)
+		bio.read(4)
+		bio.read(4)
+		bio.close()
+		return dic	
+
 	def _trak(self, trak):
 		bio = BytesIO(trak) 
-		dic = {} 
 		size = int(bio.read(4).encode('hex'), 16)
-		thkd = bio.read(size - 4)
-		head = thkd[:4].decode('utf-8')
-		dic[head] = {}
-		self._read(bio, dic[head])
+		tkhd = bio.read(size - 4)
+		dic = self._tkhd(tkhd)		
+		self._read(bio, dic)
 		bio.close()
 		return dic
 
@@ -108,11 +149,76 @@ class MP4(object):
 		bio.close()
 		return dic
 
+	def _mdhd(self, mdhd):
+		bio = BytesIO(mdhd)
+		dic = {
+			'version':int(bio.read(1).encode('hex'), 16),
+			'flag':int(bio.read(3).encode('hex'), 16)
+		}
+		
+		s = 8 if dic['version'] else 4
+		dic['create_time']=time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(int(bio.read(s).encode('hex'), 16)))
+		dic['modification_time']=time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(int(bio.read(s).encode('hex'), 16)))
+		dic['timescale']=int(bio.read(s).encode('hex'), 16) 
+		dic['duration']=int(bio.read(s).encode('hex'), 16) 
+		dic['language']='%s' % (bin(int(bio.read(2).encode('hex'), base=16))[2:17])
+		bio.close()
+		return dic
+
 	def _minf(self, minf):
 		bio = BytesIO(minf)
 		dic = {}
 		self._read(bio, dic)
 		bio.close()	
+		return dic
+
+	def _hdlr(self, hdlr):
+		bio = BytesIO(hdlr)
+		dic = {
+			'version':int(bio.read(1).encode('hex'), 16),
+			'flag':int(bio.read(3).encode('hex'), 16)
+		}
+		bio.read(4)	#Reserved
+		dic['handler-type']=bio.read(4).decode('utf-8') 
+		bio.close()
+		return dic
+
+	def _vmhd(self, vmhd):
+		bio = BytesIO(vmhd)
+		dic = {
+			'version':int(bio.read(1).encode('hex'), 16),
+			'flag':int(bio.read(3).encode('hex'), 16)
+		}
+		bio.read(8) #Reserved
+		bio.close()
+		return dic
+
+	def _dinf(self, dinf):
+		bio = BytesIO(dinf)
+		dic = {}
+		self._read(bio, dic)
+		bio.close()
+		return dic
+
+	def _dref(self, dref):
+		bio = BytesIO(dref)
+		dic = {
+			'version':int(bio.read(1).encode('hex'), 16),
+			'flag':int(bio.read(3).encode('hex'), 16)
+		}
+
+		count = int(bio.read(4).encode('hex'), 16) #Entry-Count
+
+		dic['entry'] = []
+		for i in range(0, count):	
+			size = int(bio.read(4).encode('hex'), 16)
+			data = bio.read(size)
+			dic['entry'].append({
+				'type':data[:4].decode('utf-8'),
+				'version':int(data[4:5].encode('hex'), 16),
+				'flag':int(data[5:8].encode('hex'), 16)
+			})
+		bio.close()
 		return dic
 
 	def _stbl(self, stbl):
@@ -126,21 +232,20 @@ class MP4(object):
 		bio = BytesIO(stsd)
 		dic = {
 			'version':int(bio.read(1).encode('hex'), 16),
-			'flag':bio.read(3).encode('hex'),
+			'flag':int(bio.read(3).encode('hex'), 16),
 		}
 
-		count = bio.read(4) #Entry-Count
-		count = int(count.encode('hex'), 16)
+		count = int(bio.read(4).encode('hex'), 16) #Entry-Count
 
 		dic['entry'] = []
 		for i in range(0, count):
-			size = bio.read(4)
-			size = int(size.encode('hex'), 16)
+			size = int(bio.read(4).encode('hex'), 16)
 			data = bio.read(size)
 			dic['entry'].append({
-				'type':data[:4].decode('utf-8')
+				'type':data[:4].decode('utf-8'),
+				'width':int(data[28:30].encode('hex'), 16),	
+				'height':int(data[30:32].encode('hex'), 16)
 			})
-
 		bio.close()
 		return dic
 
@@ -148,11 +253,10 @@ class MP4(object):
 		bio = BytesIO(stts)
 		dic = {
 			'version':int(bio.read(1).encode('hex'), 16),
-			'flag':bio.read(3).encode('hex'),
+			'flag':int(bio.read(3).encode('hex'), 16),
 		}
 
-		count = bio.read(4) #Entry-Count
-		count = int(count.encode('hex'), 16)
+		count = int(bio.read(4).encode('hex'), 16) #Entry-Count
 
 		dic['entry'] = []
 		for i in range(0, count):
@@ -168,7 +272,7 @@ class MP4(object):
 		bio = BytesIO(stsc)
 		dic = {
 			'version':int(bio.read(1).encode('hex'), 16),
-			'flag':bio.read(3).encode('hex'),
+			'flag':int(bio.read(3).encode('hex'), 16),
 		}
 
 		count = bio.read(4) #Entry-count
@@ -187,7 +291,7 @@ class MP4(object):
 		bio = BytesIO(stco)
 		dic = {
 			'version':int(bio.read(1).encode('hex'), 16),
-			'flag':bio.read(3).encode('hex'),
+			'flag':int(bio.read(3).encode('hex'), 16),
 		}
 
 		count = bio.read(4) #Entry-count
@@ -205,7 +309,7 @@ class MP4(object):
 		bio = BytesIO(stsz)
 		dic = {
 			'version':int(bio.read(1).encode('hex'), 16),
-			'flag':bio.read(3).encode('hex'),
+			'flag':int(bio.read(3).encode('hex'), 16),
 			'sample_size':int(bio.read(4).encode('hex'), 16)
 		}
 	
