@@ -58,9 +58,10 @@ class MP4(object):
 		elif name == 'stsd': out = self._stsd(data)
 		#elif name == 'stco': out = self._stco(data)
 		#elif name == 'stsz': out = self._stsz(data)
-		elif name == 'stsc': out = self._stsc(data)
+		#elif name == 'stsc': out = self._stsc(data)
 		elif name == 'mdat': out = {}
-		else:out = {'data':self._hex(data)}
+		#else:out = {'data':self._hex(data)}
+		else:out = {}
 
 		if dic.has_key(name):
 			if isinstance(dic[name], dict):dic[name]=[dic[name], out]
