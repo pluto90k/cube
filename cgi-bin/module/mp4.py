@@ -53,11 +53,11 @@ class MP4(object):
 		elif name == 'dinf': out = self._dinf(data)
 		elif name == 'dref': out = self._dref(data)
 		elif name == 'stbl': out = self._stbl(data)
-		elif name == 'stts': out = self._stts(data)
-		elif name == 'stss': out = self._stss(data)
+		#elif name == 'stts': out = self._stts(data)
+		#elif name == 'stss': out = self._stss(data)
 		elif name == 'stsd': out = self._stsd(data)
-		elif name == 'stco': out = self._stco(data)
-		elif name == 'stsz': out = self._stsz(data)
+		#elif name == 'stco': out = self._stco(data)
+		#elif name == 'stsz': out = self._stsz(data)
 		elif name == 'stsc': out = self._stsc(data)
 		elif name == 'mdat': out = {}
 		else:out = {'data':self._hex(data)}
