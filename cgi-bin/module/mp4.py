@@ -53,12 +53,12 @@ class MP4(object):
 		elif name == 'dinf': out = self._dinf(data)
 		elif name == 'dref': out = self._dref(data)
 		elif name == 'stbl': out = self._stbl(data)
-		#elif name == 'stts': out = self._stts(data)
-		#elif name == 'stss': out = self._stss(data)
+		elif name == 'stts': out = self._stts(data)
+		elif name == 'stss': out = self._stss(data)
 		elif name == 'stsd': out = self._stsd(data)
-		#elif name == 'stco': out = self._stco(data)
-		#elif name == 'stsz': out = self._stsz(data)
-		#elif name == 'stsc': out = self._stsc(data)
+		elif name == 'stco': out = self._stco(data)
+		elif name == 'stsz': out = self._stsz(data)
+		elif name == 'stsc': out = self._stsc(data)
 		elif name == 'mdat': out = {}
 		#else:out = {'data':self._hex(data)}
 		else:out = {}
@@ -72,8 +72,71 @@ class MP4(object):
 	def _sample_info(self, data):
 		bio = BytesIO(data)
 		dic = {
-			'type':self._str(bio.read(4))
+			'type':self._str(bio.read(4)),
+			'version':self._int(bio.read(1))
 		}
+
+		if 'esds' == dic['type']:
+			#Flags [3byte]
+			dic['flag']=self._int(bio.read(3))
+			#Tag [1byte]
+			#ES Descriptor Length [1 - 4 byte Variable]
+			#ES_ID [2byte]
+			#-------- [ 1byte ] -------------
+			#StreamDependence Flage [1bit]
+			#URL_Flag 				[1bit]
+			#OCRstreamFlag 			[1bit]
+			#StreamPriority			[5bits]
+			#--------------------------------
+				#Tag 					[1byte]
+				#Length 			  	[1 - 4 byte Variable]
+				#ObjectType Indication	[1byte]
+				#-------- [ 1byte ] -------------
+				#StreamType			  	[6bits]
+				#Upstream				[1bit]
+				#Reserved				[1bit]
+				#--------------------------------
+				#BufferSizeDB			[3byte]
+				#MaxBitrate				[4byte]
+				#AvgBitrate				[4byte]
+					#Tag					[1byte]
+					#Length 				[1 - 4 byte Variable]
+					#Info data 				[Variable]
+						#Tag 					[1byte]
+						#Length 				[1 - 4 byte Variable]
+						#Predfined				[1byte]
+		elif 'avcC' == dic['type']:
+			#AVC Profile indication [1byte]
+			bio.read(1)
+			#Profile compatibility	[1byte]
+			bio.read(1)
+			#AVC Level indication	[1byte]
+			bio.read(1)
+			#-------- [ 1byte ] -------------
+			#Reserved [6bits]
+			#Length Size Minus One [2bits] NALU Length Field Byte -1
+			bio.read(1)
+			#--------------------------------
+			#-------- [ 1byte ] -------------
+			#Reserved [3bits]
+			#SPS Count [5bits]
+			count = self._int(bio.read(1)) & 31 
+			#--------------------------------
+			dic['sps'] = []
+			for i in range(0, count):
+				#Sequence Parameter Set Length [2byte]
+				sps_len = self._int(bio.read(2))
+				dic['sps'].append(self._hex(bio.read(sps_len)))
+
+			#PPS Count [1byte]
+			count = self._int(bio.read(1))
+
+			dic['pps'] = []
+			for i in range(0, count):
+				#Picture Parameter Set Length [2byte]
+				pps_len = self._int(bio.read(2))
+				dic['pps'].append(self._hex(bio.read(pps_len)))	
+
 		bio.close()
 		return dic
 
@@ -84,29 +147,29 @@ class MP4(object):
 			'type':self._str(bio.read(4))
 		}
 
-		bio.read(1 * 6) 								#Reserved
-		bio.read(2)		 								#Data-reference-index
-		bio.read(2)		 								#Pre_defined
-		bio.read(2)		 								#Reserved
-		bio.read(4 * 3)	 								#Pre_defined
+		bio.read(1 * 6) 									#Reserved
+		bio.read(2)		 									#Data-reference-index
+		bio.read(2)		 									#Pre_defined
+		bio.read(2)		 									#Reserved
+		bio.read(4 * 3)	 									#Pre_defined
 
-		if 'mp4v' == dic['type']:
-			dic['width']  = self._int(bio.read(2))
-			dic['height'] = self._int(bio.read(2))
-			dic['horiz_resolution']=self._hex(bio.read(4))
-			dic['verti_resolution']=self._hex(bio.read(4))
+		if 'mp4v' == dic['type'] or 'avc1' == dic['type']:	#Sample_Video_Info
+			dic['width']  = self._int(bio.read(2))			#Width
+			dic['height'] = self._int(bio.read(2))			#Height
+			dic['horiz_resolution']=self._hex(bio.read(4))	#Hresolution
+			dic['verti_resolution']=self._hex(bio.read(4))	#Vresolution
 			bio.read(4)		 								#Reserved
-			dic['frame_count']=self._int(bio.read(2))
+			dic['frame_count']=self._int(bio.read(2))		#FrameCount
 			bio.read(1 * 32) 								#Compressonrname
-			dic['depth']=self._hex(bio.read(2))
+			dic['depth']=self._hex(bio.read(2))				#Depth
 			bio.read(2) 									#Pre_defined
-			
 			size = self._int(bio.read(4))
 			dic['conf'] = self._sample_info(bio.read(size))
-			dic['data'] = self._hex(bio.read())
 		elif 'mp4a' == dic['type']:			
-			pass
-
+			dic['timescale']=self._int(bio.read(2))			#TimeScale
+			bio.read(2)										#Reserved
+			size = self._int(bio.read(4))
+			dic['conf'] = self._sample_info(bio.read(size))
 		bio.close()
 		return dic
 

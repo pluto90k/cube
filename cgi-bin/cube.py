@@ -11,10 +11,14 @@ def _json(data):
 #MP4 Stream Out
 def _out(filename, chunk_size=1024):
 	out_file = sys.stdout
-	head =  "Content-Type:application/octet-stream; name = \"%s\"\r\n" % filename;
-	print head
+	#head =  "Content-Type:application/octet-stream; name = \"%s\"\r\n" % filename
+	head =  "Accept-Ranges:bytes\r\n"
+	head +=  "Content-Type:video/mp4\r\n"
+	head +=  "Content-Length:%ld\r\n" % os.stat(filename).st_size
 
 	fo = open(filename, "rb")
+	print head
+
 	while True:
 		out = fo.read(chunk_size)
 		if out:
