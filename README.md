@@ -18,18 +18,21 @@ root@linux-01:/data/cube> python -m CGIHTTPServer 8000 .
 
 Serving HTTP on 0.0.0.0 port 8000 ...
 
-#Media Info (JSON)
-* * *
+# Media Info (JSON)
+
 curl -i http://localhost:8000/cgi-bin/cube.py?file=Robotica.json
 
-#MP4 (MPEG-4) Download
 * * *
+
+# MP4 (MPEG-4) Download
 
 wget -O Robotica.mp4 http://localhost:8000/cgi-bin/cube.py?file=Robotica.mp4
 
-#TS (Transport Stream) Download
 * * *
 
+# TS (Transport Stream) Download
+
+wget -O Robotica(-([0-9]+)).ts http://localhost:8000/cgi-bin/cube.py?file=Robotica(-([0-9]+)).ts
 
 
 #Nginx Proxy Setting
