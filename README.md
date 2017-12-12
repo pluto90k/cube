@@ -32,7 +32,7 @@ wget -O Robotica.mp4 http://localhost:8000/cgi-bin/cube.py?file=Robotica.mp4
 
 ### M3U8 (Http Live Streaming) Download
 
-wget -O Robotica.m3u8 http://localhost:8000/cgi-bin/cube.py?file=Robotica.m3u8
+curl -i http://localhost:8000/cgi-bin/cube.py?file=Robotica.m3u8
 
 * * *
 
