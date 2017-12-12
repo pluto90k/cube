@@ -30,6 +30,12 @@ wget -O Robotica.mp4 http://localhost:8000/cgi-bin/cube.py?file=Robotica.mp4
 
 * * *
 
+### M3U8 (Http Live Streaming) Download
+
+wget -O Robotica.m3u8 http://localhost:8000/cgi-bin/cube.py?file=Robotica.m3u8
+
+* * *
+
 ### TS (Transport Stream) Download
 
 wget -O Robotica(-([0-9]+)).ts http://localhost:8000/cgi-bin/cube.py?file=Robotica(-([0-9]+)).ts
