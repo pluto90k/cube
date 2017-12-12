@@ -1,8 +1,9 @@
-# cube
 Python MP4 Streaming Server
 ===========================
+
 VideoCube Blog
 --------------
+
 http://videocube.tistory.com/entry/Cube-Media-Streaming-Server
 * * *
 
