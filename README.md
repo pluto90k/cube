@@ -1,10 +1,10 @@
 # cube
 Python MP4 Streaming Server
-
+===========================
 VideoCube Blog
-
+--------------
 http://videocube.tistory.com/entry/Cube-Media-Streaming-Server
-
+* * *
 
 
 git clone https://github.com/pluto90k/cube.git
@@ -17,18 +17,22 @@ root@linux-01:/data/cube> python -m CGIHTTPServer 8000 .
 
 Serving HTTP on 0.0.0.0 port 8000 ...
 
-
-Media Info
-
+#Media Info (JSON)
+* * *
 curl -i http://localhost:8000/cgi-bin/cube.py?file=Robotica.json
 
-MP4 Download
+#MP4 (MPEG-4) Download
+* * *
 
 wget -O Robotica.mp4 http://localhost:8000/cgi-bin/cube.py?file=Robotica.mp4
 
-Nginx Proxy
+#TS (Transport Stream) Download
+* * *
 
-	location ~ \.(mp4|json)$ {
+
+
+#Nginx Proxy Setting
+	location ~ \.(mp4|json|m3u8|ts)$ {
         rewrite ^/(.*) /cgi-bin/cube.py?file=$1 break;
         proxy_pass http://127.0.0.1:8000;
     }

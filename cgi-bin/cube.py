@@ -5,7 +5,7 @@ from module.mp4 import MP4
 
 #JSON Print
 def _json(data):
-	print "Content-type: application/json\n\n"
+	print "Content-type: application/json\r\n"
 	print(json.dumps(data))
 
 #MP4 Stream Out
@@ -28,19 +28,31 @@ def _out(filename, chunk_size=1024):
 
 	fo.close()
 
+#HLS (Http Live Streaming)
+def _hls(name, filename):
+	print "Content-type:application/vnd.apple.mpegurl\r\n"
+	print "#EXTM3U\r\n"
+	print "#EXT-X-TARGETDURATION:10\r\n"
+
+	for i in range(0, 10):
+		print "#EXTINF:11,\n"
+		print "%s-%d.ts\n" % ( name, i )
+
+	print "#EXT-X-ENDLIST\r\n"
+
 form = cgi.FieldStorage()
 fileName = form.getvalue('file')
 
-p = re.compile("(.+)\.(mp4|json)(.+)?")
+p = re.compile("(.+)\.(mp4|json|m3u8|ts)(.+)?")
 g = p.search(fileName)
 
 data = {'error':'none', 'data':None}
 
 if g:
-	fileName = g.group(1)	    #FileName
+	name = g.group(1)	    #FileName
 	ext = g.group(2)  		#File extensions
 
-	fileName = "%s.%s" % (fileName, 'mp4')
+	fileName = "%s.%s" % (name, 'mp4')
 
 	if not os.path.exists(fileName):     #File Check
 		data["error"] = "Unknown File"
@@ -51,6 +63,10 @@ if g:
 		_json(data)
 	elif ext == 'mp4':  				#Mp4Stream
 		_out(fileName)
+	elif ext == 'm3u8':  				#Http Live Streaming
+		_hls(name, fileName)
+	elif ext == 'ts':
+		pass
 else:
 	data["error"] = "Unknown File"
 	_json(data)
