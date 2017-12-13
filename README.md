@@ -20,25 +20,25 @@ Serving HTTP on 0.0.0.0 port 8000 ...
 
 ### Media Info (JSON)
 
-curl -i http://localhost:8000/cgi-bin/cube.py?file=Robotica.json
+curl -i http://localhost:8000/cgi-bin/cube.py?file=BigBuckBunny.json
 
 * * *
 
 ### MP4 (MPEG-4) Download
 
-wget -O Robotica.mp4 http://localhost:8000/cgi-bin/cube.py?file=Robotica.mp4
+wget -O BigBuckBunny.mp4 http://localhost:8000/cgi-bin/cube.py?file=BigBuckBunny.mp4
 
 * * *
 
 ### M3U8 (Http Live Streaming) Download
 
-curl -i http://localhost:8000/cgi-bin/cube.py?file=Robotica.m3u8
+curl -i http://localhost:8000/cgi-bin/cube.py?file=BigBuckBunny.m3u8
 
 * * *
 
 ### TS (Transport Stream) Download
 
-wget -O Robotica(-([0-9]+)).ts http://localhost:8000/cgi-bin/cube.py?file=Robotica(-([0-9]+)).ts
+wget -O BigBuckBunny(-([0-9]+)).ts http://localhost:8000/cgi-bin/cube.py?file=BigBuckBunny(-([0-9]+)).ts
 
 
 ### Nginx Proxy Setting
