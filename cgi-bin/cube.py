@@ -25,7 +25,7 @@ def _out(filename, chunk_size=1024):
 		if out:
 			out_file.write(out)
 		else:
-			break;		
+			break;
 
 	fo.close()
 
@@ -55,10 +55,11 @@ if g:
 	elif ext == 'm3u8':  				#Http Live Streaming
 		HLS(fileName).m3u8()
 	elif ext == 'ts':
-		#TODO :HLS(fileName).ts() segment
 		#TODO :TS(fileName).out() convert
-		pass
+		seq = form.getvalue('seq')
+		sec = form.getvalue('sec')
+		TS(fileName).segment(seq, sec).buffer()
+
 else:
 	data["error"] = "Unknown File"
 	_json(data)
-

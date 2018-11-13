@@ -24,7 +24,7 @@ class MP4(object):
 		return "%s" % (bin(self._int(data))[2:size + 2])
 
 	def _int(self, data):
-		return int(data.encode('hex'), 16)		
+		return int(data.encode('hex'), 16)
 
 	def _str(self, data):
 		return data.decode('utf-8')
@@ -120,7 +120,7 @@ class MP4(object):
 			#-------- [ 1byte ] -------------
 			#Reserved [3bits]
 			#SPS Count [5bits]
-			count = self._int(bio.read(1)) & 31 
+			count = self._int(bio.read(1)) & 31
 			#--------------------------------
 			dic['sps'] = []
 			for i in range(0, count):
@@ -135,7 +135,7 @@ class MP4(object):
 			for i in range(0, count):
 				#Picture Parameter Set Length [2byte]
 				pps_len = self._int(bio.read(2))
-				dic['pps'].append(self._hex(bio.read(pps_len)))	
+				dic['pps'].append(self._hex(bio.read(pps_len)))
 
 		bio.close()
 		return dic
@@ -165,7 +165,7 @@ class MP4(object):
 			bio.read(2) 									#Pre_defined
 			size = self._int(bio.read(4))
 			dic['conf'] = self._sample_info(bio.read(size))
-		elif 'mp4a' == dic['type']:			
+		elif 'mp4a' == dic['type']:
 			dic['timescale']=self._int(bio.read(2))			#TimeScale
 			bio.read(2)										#Reserved
 			size = self._int(bio.read(4))
@@ -183,12 +183,12 @@ class MP4(object):
 		while True:
 			s = FH.read(l-size)
 			head = self._str(s[:4])
-			self._parser(head, dic, s[4:]) 
+			self._parser(head, dic, s[4:])
 			s = FH.read(size)
 			if s == '': break
 			l = self._int(s[:4])
 
-		FH.close()	
+		FH.close()
 		return dic
 
 	def _moov(self, moov):
@@ -199,24 +199,24 @@ class MP4(object):
 		return dic
 
 	def _mvhd(self, mvhd):
-		bio = BytesIO(mvhd) 
+		bio = BytesIO(mvhd)
 		dic = {
 			'version':self._int(bio.read(1)),
 			'flag':self._int(bio.read(3))
 		}
-		
+
 		s = 8 if dic['version'] else 4
 		dic['create_time']=self._time(bio.read(s))
 		dic['modification_time']=self._time(bio.read(s))
 		dic['timescale']=self._int(bio.read(s))
-		dic['duration']=self._int(bio.read(s)) 
+		dic['duration']=self._int(bio.read(s))
 
 		#Reserved
-		bio.read(4) 
-		bio.read(2) 
-		bio.read(2) 
-		bio.read(8) 
-		bio.read(4 * 9) 
+		bio.read(4)
+		bio.read(2)
+		bio.read(2)
+		bio.read(8)
+		bio.read(4 * 9)
 		bio.read(4 * 6)
 		#--Reserved
 
@@ -226,7 +226,7 @@ class MP4(object):
 		return dic
 
 	def _tkhd(self, tkhd):
-		bio = BytesIO(tkhd) 
+		bio = BytesIO(tkhd)
 		dic = {}
 		head = bio.read(4).decode('utf-8')
 		dic[head] = {
@@ -247,13 +247,13 @@ class MP4(object):
 		bio.read(4)
 		bio.read(4)
 		bio.close()
-		return dic	
+		return dic
 
 	def _trak(self, trak):
-		bio = BytesIO(trak) 
+		bio = BytesIO(trak)
 		size = self._int(bio.read(4))
 		tkhd = bio.read(size - 4)
-		dic = self._tkhd(tkhd)		
+		dic = self._tkhd(tkhd)
 		self._read(bio, dic)
 		bio.close()
 		return dic
@@ -271,12 +271,12 @@ class MP4(object):
 			'version':self._int(bio.read(1)),
 			'flag':self._int(bio.read(3))
 		}
-		
+
 		s = 8 if dic['version'] else 4
 		dic['create_time']=self._time(bio.read(s))
 		dic['modification_time']=self._time(bio.read(s))
-		dic['timescale']=self._int(bio.read(s)) 
-		dic['duration']=self._int(bio.read(s)) 
+		dic['timescale']=self._int(bio.read(s))
+		dic['duration']=self._int(bio.read(s))
 		dic['language']=self._bin(bio.read(2), 15)
 		bio.close()
 		return dic
@@ -285,7 +285,7 @@ class MP4(object):
 		bio = BytesIO(minf)
 		dic = {}
 		self._read(bio, dic)
-		bio.close()	
+		bio.close()
 		return dic
 
 	def _hdlr(self, hdlr):
@@ -295,7 +295,7 @@ class MP4(object):
 			'flag':self._int(bio.read(3))
 		}
 		bio.read(4)	#Reserved
-		dic['handler-type']=self._str(bio.read(4)) 
+		dic['handler-type']=self._str(bio.read(4))
 		bio.close()
 		return dic
 
@@ -326,7 +326,7 @@ class MP4(object):
 		count = self._int(bio.read(4)) #Entry-Count
 
 		dic['entry'] = []
-		for i in range(0, count):	
+		for i in range(0, count):
 			size = self._int(bio.read(4))
 			data = bio.read(size)
 			dic['entry'].append({
@@ -341,7 +341,7 @@ class MP4(object):
 		bio = BytesIO(stbl)
 		dic = {}
 		self._read(bio, dic)
-		bio.close()	
+		bio.close()
 		return dic
 
 	def _stsd(self, stsd):
@@ -367,17 +367,17 @@ class MP4(object):
 			'version':self._int(bio.read(1)),
 			'flag':self._int(bio.read(3))
 		}
-		
+
 		count = self._int(bio.read(4)) #Entry-Count
-		
+
 		dic['entry'] = []
 		for i in range(0, count):
 			dic['entry'].append({
 				'sample-number':self._int(bio.read(4)),
 			})
-		
+
 		bio.close()
-		return dic	
+		return dic
 
 	def _stts(self, stts):
 		bio = BytesIO(stts)
@@ -396,7 +396,7 @@ class MP4(object):
 			})
 
 		bio.close()
-		return dic	
+		return dic
 
 	def _stsc(self, stsc):
 		bio = BytesIO(stsc)
@@ -425,7 +425,7 @@ class MP4(object):
 		}
 
 		count = self._int(bio.read(4)) #Entry-count
-	
+
 		dic['entry'] = []
 		for i in range(0, count):
 			dic['entry'].append({
@@ -441,9 +441,9 @@ class MP4(object):
 			'flag':self._int(bio.read(3)),
 			'sample_size':self._int(bio.read(4))
 		}
-	
+
 		count = self._int(bio.read(4)) #Entry-count
-			
+
 		dic['entry'] = []
 		for i in range(0, count):
 			size = bio.read(4)
@@ -462,5 +462,4 @@ class MP4(object):
 		}
 
 if __name__ == '__main__':
-	MP4('../../Robotica.mp4').dic()
-
+	MP4('../../BigBuckBunny.mp4').dic()
