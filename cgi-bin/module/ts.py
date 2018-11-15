@@ -11,20 +11,22 @@ class TS(MP4):
 
 	def _parse(self, stts, offset, duration, timescale):
 
-		num = time = t_temp = n_temp = 0
+		num = time = t_temp = 0
+		offset_num = 1
+
 		min = offset * timescale
 		max = (offset + duration) * timescale
 
 		for data in stts:
 			for n in range(data['count']):
-				n_temp += 1
 				t_temp += data['delta']
-				if t_temp > max: return (num, time)
-
-				num = n_temp
-
+				if t_temp > max: return (offset_num, num, time)
 				if t_temp > min:
 					time += data['delta']
+				else:
+					offset_num += 1
+
+				num += 1
 
 	def segment(self, seq, duration):
 		atom = self.dic()['atom']
@@ -41,7 +43,7 @@ class TS(MP4):
 				stsc = stbl['stsc']['entry']	#Sample Count Per Chunk
 				stss = stbl['stss']['entry']
 				stts = stbl['stts']['entry']	#Sample Count PlayTime
-				print (mdhd)
+
 				print self._parse(stts, timeoffset, duration, mdhd['timescale'])
 
 			elif trak['mdia']['hdlr']['handler-type'] == 'soun':
@@ -51,7 +53,7 @@ class TS(MP4):
 				stsz = stbl['stsz']['entry']	#Sample Size
 				stsc = stbl['stsc']['entry']	#Sample Count Per Chunk
 				stts = stbl['stts']['entry']	#Sample Count PlayTime
-				print (mdhd)
+
 				print self._parse(stts, timeoffset, duration, mdhd['timescale'])
 
 		return self
@@ -61,4 +63,4 @@ class TS(MP4):
 
 
 if __name__ == '__main__':
-	TS('../../BigBuckBunny.mp4').segment(3, 10)
+	TS('../../BigBuckBunny.mp4').segment(2, 10)
