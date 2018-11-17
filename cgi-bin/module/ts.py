@@ -42,19 +42,31 @@ class TS(MP4):
 
 		min = offset * timescale
 		max = (offset + duration) * timescale
-
+		pos = -1
+		chunk_offet = 0
 		for data in stts:
 			for n in range(data['count']):
 				t_temp += data['delta']
 				if t_temp > max: break
 				if t_temp > min:
+
+					_pos = self._findChunkIndex(stsc, num) - 1
+
+					if _pos != pos:
+						pos = _pos
+						chunk_offet = stco[pos]['chunk_offset']
+
+					size = stsz[num - 1]['entry_size']
+
 					pack = {
 						"id": num,
 						"type": str(type),
 						"pts": time / float(timescale),
-						"chunk_offset": stco[self._findChunkIndex(stsc, num)]['chunk_offset'],
-						"sample_size": stsz[num - 1]['entry_size']
+						"chunk_offset": chunk_offet,
+						"sample_size": size
 					}
+
+					chunk_offet = chunk_offet + size
 
 					if type == 'vide':
 						pack['dts'] = t_temp / float(timescale)
@@ -71,24 +83,35 @@ class TS(MP4):
 		traks = atom['moov']['trak']
 
 		timeoffset = seq * duration
+
+		#sampling
 		sample = []
 
 		for trak in traks:
 			out = self._sample(trak, timeoffset, duration)
 			if out: sample.extend(out)
 
-		sample = sorted(sample, key=self._getKey)
-		print sample
-
-
-
-
-
-
+		self.sample = sorted(sample, key=self._getKey)
 		return self
+
+	def ts(self):
+		FH = open(self.fileName, 'rb')
+		for sample in self.sample:
+
+			offset = sample['chunk_offset']
+			size = sample['sample_size']
+
+			FH.seek(offset)
+			data = FH.read(size)
+			print "\n"
+			print sample['type']
+			print self._hex(data)
+
+		return
+		#print sample
 
 	def buffer(self):
 		print 'buffer'
 
 if __name__ == '__main__':
-	TS('../../BigBuckBunny.mp4').segment(0, 10)
+	TS('../../BigBuckBunny.mp4').segment(0, 10).ts()
