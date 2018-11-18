@@ -16,7 +16,7 @@ class MP4(object):
 		while True:
 			s = bio.read(1)
 			if s == '': break
-			txt = txt + '%02X' % int(ord(s))
+			txt = txt + '%02X ' % int(ord(s))
 		bio.close()
 		return txt
 
