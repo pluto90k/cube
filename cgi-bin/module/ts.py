@@ -104,6 +104,7 @@ class TS(MP4):
 			FH.seek(offset)
 			data = FH.read(size)
 			print "\n"
+			print sample['pts']
 			print sample['type']
 			print self._hex(data)
 
