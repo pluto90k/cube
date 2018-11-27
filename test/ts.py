@@ -15,7 +15,11 @@ def _hex(byte):
 	bio.close()
 	return txt
 
-FH = open('./ts/BigBuckBunny-1.ts', 'rb')
-for num in range(0, 100):
-    print _hex(FH.read(4))
-    print _hex(FH.read(184))
+FH = open('./ts/BigBuckBunny-2.ts', 'rb')
+
+while True:
+	s = FH.read(4)
+	if s == '': break
+	print _hex(s)
+	s = FH.read(184)
+	print _hex(s)
