@@ -80,31 +80,49 @@ class MP4(object):
 			#Flags [3byte]
 			dic['flag']=self._int(bio.read(3))
 			#Tag [1byte]
+			dic['tag-03'] = self._hex(bio.read(1))
 			#ES Descriptor Length [1 - 4 byte Variable]
+			#MPEG-4 specification ISO/IEC FDIS 14496-1
+			dic['length-03'] = self._hex(bio.read(1))
 			#ES_ID [2byte]
+			dic['es_id'] = self._hex(bio.read(2))
 			#-------- [ 1byte ] -------------
+			dic['info'] = self._hex(bio.read(1))
 			#StreamDependence Flage [1bit]
 			#URL_Flag 				[1bit]
 			#OCRstreamFlag 			[1bit]
 			#StreamPriority			[5bits]
 			#--------------------------------
-				#Tag 					[1byte]
-				#Length 			  	[1 - 4 byte Variable]
-				#ObjectType Indication	[1byte]
-				#-------- [ 1byte ] -------------
-				#StreamType			  	[6bits]
-				#Upstream				[1bit]
-				#Reserved				[1bit]
-				#--------------------------------
-				#BufferSizeDB			[3byte]
-				#MaxBitrate				[4byte]
-				#AvgBitrate				[4byte]
-					#Tag					[1byte]
-					#Length 				[1 - 4 byte Variable]
-					#Info data 				[Variable]
-						#Tag 					[1byte]
-						#Length 				[1 - 4 byte Variable]
-						#Predfined				[1byte]
+			dic['tag-04'] = self._hex(bio.read(1))
+			#Tag 					[1byte]
+			dic['length-04'] = self._hex(bio.read(1))
+			#Length 			  	[1 - 4 byte Variable]
+			#ObjectType Indication	[1byte]
+			dic['objectType_indication'] = self._hex(bio.read(1))
+			#-------- [ 1byte ] -------------
+			dic['type'] = self._hex(bio.read(1))
+			#StreamType			  	[6bits]
+			#Upstream				[1bit]
+			#Reserved				[1bit]
+			#--------------------------------
+			dic['BufferSizeDB'] = self._hex(bio.read(3))
+			#BufferSizeDB			[3byte]
+			dic['MaxBitrate'] = self._hex(bio.read(4))
+			#MaxBitrate				[4byte]
+			dic['AvgBitrate'] = self._hex(bio.read(4))
+			#AvgBitrate				[4byte]
+			dic['tag-05'] = self._hex(bio.read(1))
+			#Tag					[1byte]
+			dic['length-05'] = self._int(bio.read(1))
+			#Length 				[1 - 4 byte Variable]
+			dic['info_data'] = self._hex(bio.read(dic['length-05']))
+			#Info data 				[Variable]
+			dic['tag-06'] = self._hex(bio.read(1))
+			#Tag 					[1byte]
+			dic['length-06'] = self._int(bio.read(1))
+			#Length 				[1 - 4 byte Variable]
+			dic['Predfined'] = self._hex(bio.read(1))
+			#Predfined				[1byte]
 		elif 'avcC' == dic['type']:
 			#AVC Profile indication [1byte]
 			bio.read(1)
@@ -172,6 +190,93 @@ class MP4(object):
 			dic['conf'] = self._sample_info(bio.read(size))
 		bio.close()
 		return dic
+
+	def _findChunkIndex(self, stsc, num):
+		count = 0
+		for obj in stsc:
+			count += obj['sample_per_chunk']
+			if num < count:
+				return obj['first_chunk_index']
+		return 0
+
+	def _sample(self, timeoffset, duration):
+		atom = self.dic()['atom']
+		traks = atom['moov']['trak']
+		#sampling
+		sample = {}
+		for trak in traks:
+			type = trak['mdia']['hdlr']['handler-type']
+			out = self._sampling(trak, timeoffset, duration)
+			if type == 'vide':
+				sample['video'] = out
+			elif type == 'soun':
+				sample['audio'] = out
+
+		return sample
+
+	def _sampling(self, trak, offset, duration):
+		sample = []
+		type = trak['mdia']['hdlr']['handler-type']
+
+		if type != 'vide' and type != 'soun':
+			return
+
+		mdhd = trak['mdia']['mdhd']
+		stbl = trak['mdia']['minf']['stbl']
+		stco = stbl['stco']['entry']	#Chunk Offset
+		stsz = stbl['stsz']['entry']	#Sample Size
+		stsc = stbl['stsc']['entry']	#Sample Count Per Chunk
+		stts = stbl['stts']['entry']	#Sample Count PlayTime
+		keyframe = []
+
+		if type == 'vide':
+			stss = stbl['stss']['entry'] #KeyFrame Info
+			for obj in stss:
+				keyframe.append(obj['sample-number'])
+
+		timescale = mdhd['timescale']
+		time = t_temp = 0
+		num = 1
+
+		min = offset * timescale
+		max = (offset + duration) * timescale
+		pos = -1
+		chunk_offet = 0
+		for data in stts:
+			for n in range(data['count']):
+				#TODO : 2018-11-27
+				t_temp += data['delta']
+				if t_temp > max: break
+				if t_temp > min:
+
+					_pos = self._findChunkIndex(stsc, num) - 1
+
+					if _pos != pos:
+						pos = _pos
+						chunk_offet = stco[pos]['chunk_offset']
+
+					size = stsz[num - 1]['entry_size']
+
+					pack = {
+						"id": num,
+						"type": str(type),
+						"time": time,
+						"timescale" : timescale,
+						"chunk_offset": chunk_offet,
+						"sample_size": size
+					}
+
+					if keyframe:
+						pack['keyframe'] = num in keyframe
+
+					chunk_offet = chunk_offet + size
+					sample.append(pack)
+
+					time += data['delta']
+
+				num += 1
+
+		return sample
 
 	def _atom(self):
 		FH = open(self.fileName, 'rb')
@@ -462,4 +567,5 @@ class MP4(object):
 		}
 
 if __name__ == '__main__':
-	MP4('../../BigBuckBunny.mp4').dic()
+	for trak in MP4('../../BigBuckBunny.mp4').dic()['atom']['moov']['trak']:
+		print trak['mdia']['minf']['stbl']['stss']

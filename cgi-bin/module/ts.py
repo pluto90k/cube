@@ -9,110 +9,77 @@ class TS(MP4):
 		super(TS,self).__init__(file_name)
 		self.fileName = file_name
 
-	def _getKey(self, item):
-		return item['pts']
+	def _readFS(self, FH, offset, size):
+		FH.seek(offset)
+		data = FH.read(size)
+		return data
 
-	def _findChunkIndex(self, stsc, num):
-		count = 0
-		for obj in stsc:
-			count += obj['sample_per_chunk']
-			if num < count:
-				return obj['first_chunk_index']
+	#AccessUnitDelimeter
+	#HEAD (4Byte) Length | DATA
+	#00 00 00 01 09 F0 00 00 00 01
+	def _AUD(self, data):
+		nal = b'\x00\x00\x00\x01'
+		data = nal + data[4:]
+		head = b'\x00\x00\x00\x01\x09\xF0'
+		data = head + data
+		return data
 
-		return 0
-	def _sample(self, trak, offset, duration):
-		sample = []
-		type = trak['mdia']['hdlr']['handler-type']
+	#AudioDataTransportStream
+	def _ADTS(self, data):
+		# --------------------------------------------
+		# 1111 1111
+		# -------------------------------------------- FF
+		# 1111
+		#fix = bytes(hex(int('0b111111111111', base=2)))
 
-		if type != 'vide' and type != 'soun':
-			return
-
-		mdhd = trak['mdia']['mdhd']
-		stbl = trak['mdia']['minf']['stbl']
-		stco = stbl['stco']['entry']	#Chunk Offset
-		stsz = stbl['stsz']['entry']	#Sample Size
-		stsc = stbl['stsc']['entry']	#Sample Count Per Chunk
-		stts = stbl['stts']['entry']	#Sample Count PlayTime
-		#stss = stbl['stss']['entry']
-		#print stco
-
-		timescale = mdhd['timescale']
-		time = t_temp = 0
-		num = 1
-
-		min = offset * timescale
-		max = (offset + duration) * timescale
-		pos = -1
-		chunk_offet = 0
-		for data in stts:
-			for n in range(data['count']):
-				t_temp += data['delta']
-				if t_temp > max: break
-				if t_temp > min:
-
-					_pos = self._findChunkIndex(stsc, num) - 1
-
-					if _pos != pos:
-						pos = _pos
-						chunk_offet = stco[pos]['chunk_offset']
-
-					size = stsz[num - 1]['entry_size']
-
-					pack = {
-						"id": num,
-						"type": str(type),
-						"pts": time / float(timescale),
-						"chunk_offset": chunk_offet,
-						"sample_size": size
-					}
-
-					chunk_offet = chunk_offet + size
-
-					if type == 'vide':
-						pack['dts'] = t_temp / float(timescale)
-
-					sample.append(pack)
-					time += data['delta']
-
-				num += 1
-
-		return sample
+		# 0	 	MPEG-4 ( 0 ) MPEG-2 ( 1 )
+		# 00 	layer always 0
+		# 1  	protection absent, Warning, set to 1 if there is no CRC and 0 if there is CRC
+		# -------------------------------------------- F1
+		# 01 	profile, 00 Main 01 LC 10 SSR 11 AAC TP
+		# 01 00 MPEG-4 Sampling Frequency Index ( 15 is forbidden )
+		# 0		private bit
+		# 0 10	channel_configuration
+		# 0		originality
+		# 0		home
+		# 0		copyright_identification_bit
+		# 0		copyright_identification_start
+		# 00 0001 1101 000 aac_frame_length
+		# 1 1111 1111 11   adts_buffer_fullness
+		# 00	no_raw_data_blocks_inframe
+		#FF F1 50 80 04 3F FC DE 04 00 00 6C 69 62 66 61 61 63 20 31 2E 32 38 00 00 42 00 93 20 04 32 00 47 ( 7 + 26 byte )
+		#         50           80 04 3F FC
+		#01 0100 0 010 0 0 0 0 00 0000 0100 001 11111111111 00 ( 33 )
+		#1111 1111
+		#0000 0010
+		_len = len(data) + 7
+		print _len
+		return data
 
 	def segment(self, seq, duration):
-		atom = self.dic()['atom']
-		traks = atom['moov']['trak']
-
 		timeoffset = seq * duration
-
-		#sampling
-		sample = []
-
-		for trak in traks:
-			out = self._sample(trak, timeoffset, duration)
-			if out: sample.extend(out)
-
-		self.sample = sorted(sample, key=self._getKey)
+		self.sample = self._sample(timeoffset, duration)
 		return self
 
 	def ts(self):
 		FH = open(self.fileName, 'rb')
-		for sample in self.sample:
+		while self.sample['video'] or self.sample['audio']:
+			if self.sample['video']:
+				sample = self.sample['video'].pop(0)
+				offset = sample['chunk_offset']
+				size = sample['sample_size']
+				data = self._AUD(self._readFS(FH, offset, size))
 
-			offset = sample['chunk_offset']
-			size = sample['sample_size']
-
-			FH.seek(offset)
-			data = FH.read(size)
-			print "\n"
-			print sample['pts']
-			print sample['type']
-			print self._hex(data)
+			if self.sample['audio']:
+				sample = self.sample['audio'].pop(0)
+				offset = sample['chunk_offset']
+				size = sample['sample_size']
+				data = self._ADTS(self._readFS(FH, offset, size))
+				print self._hex(data)
 
 		return
-		#print sample
-
 	def buffer(self):
 		print 'buffer'
 
 if __name__ == '__main__':
-	TS('../../BigBuckBunny.mp4').segment(0, 10).ts()
+	TS('../../BigBuckBunny.mp4').segment(0, 1).ts()

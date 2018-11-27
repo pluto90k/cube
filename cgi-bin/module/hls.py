@@ -18,7 +18,7 @@ class HLS(MP4):
 		timescale = self.atom['moov']['mvhd']['timescale']
 		duration = self.atom['moov']['mvhd']['duration'] // timescale
 		total = duration / sec, duration % sec
-		
+
 		if total[1] > 0:total = total[0] + 1
 		else:total = total[0]
 
@@ -26,10 +26,14 @@ class HLS(MP4):
 		print "#EXTM3U\r\n"
 		print "#EXT-X-TARGETDURATION:%d\r\n" % (sec)
 
+		t = 0
 		for i in range(0, total):
-			print "#EXTINF:%d,\n" % sec
+			sample = self._sample(i, sec)['audio'][-1]
+			inf = float(sample['time']) / float(sample['timescale'])
+			print "#EXTINF:%.2f,\n" % (inf)
+			t += inf
 			print "cube.py?file=%s.ts?seq=%d&sec=%d\n" % ( self.name, i, sec )
-
+		
 		print "#EXT-X-ENDLIST\r\n"
 
 if __name__ == '__main__':
