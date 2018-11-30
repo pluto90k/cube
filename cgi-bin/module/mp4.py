@@ -212,6 +212,22 @@ class MP4(object):
 		sample_size = 2
 		return (chunk_offet, sample_size)
 
+	def _make_sample_info(self, stsc, stco, stsz):
+		info = []
+		sample = {
+			"offet":1,
+			"size":1
+		}
+		info.append(sample)
+		return info
+
+	def _make_sample_keyframe_info(self, stbl):
+		info = []
+		stss = stbl['stss']['entry'] #KeyFrame Info
+		for obj in stss:
+			info.append(obj['sample-number'])
+		return info
+
 	def _sampling(self, trak, offset, duration):
 		sample = []
 		type = trak['mdia']['hdlr']['handler-type']
@@ -225,16 +241,14 @@ class MP4(object):
 		stsz = stbl['stsz']['entry']	#Sample Size
 		stsc = stbl['stsc']['entry']	#Sample Count Per Chunk
 		stts = stbl['stts']['entry']	#Sample Count PlayTime
-		keyframe = []
 
-		if type == 'vide':
-			stss = stbl['stss']['entry'] #KeyFrame Info
-			for obj in stss:
-				keyframe.append(obj['sample-number'])
+		sample_info = self._make_sample_info(stsc, stco, stsz)
+		keyframe = self._make_sample_keyframe_info(stbl) if type == 'vide' else []
 
 		timescale = mdhd['timescale']
-		time = 0
-		t_temp = 0
+		a_time = 0	#TOTAL TIME
+
+		time = 0	#TS TIME
 		min = offset * timescale
 		max = (offset + duration) * timescale
 		sample_num = 1
@@ -242,10 +256,11 @@ class MP4(object):
 		for data in stts:
 			for n in range(data['count']):
 				#TODO : 2018-11-27
-				t_temp += data['delta']
-				if t_temp > max: break
-				if t_temp > min:
+				a_time += data['delta']
+				if a_time > max: break
+				if a_time > min:
 					(chunk_offet, sample_size) = self._get_sample_info(sample_num, stsc, stco, stsz)
+
 					pack = {
 						"id": sample_num,
 						"type": str(type),
@@ -260,7 +275,9 @@ class MP4(object):
 
 					sample.append(pack)
 					time += data['delta']
+
 				sample_num += 1
+
 		return sample
 
 	def _atom(self):
