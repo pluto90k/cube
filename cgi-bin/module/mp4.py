@@ -191,14 +191,6 @@ class MP4(object):
 		bio.close()
 		return dic
 
-	def _findChunkIndex(self, stsc, num):
-		count = 0
-		for obj in stsc:
-			count += obj['sample_per_chunk']
-			if num < count:
-				return obj['first_chunk_index']
-		return 0
-
 	def _sample(self, timeoffset, duration):
 		atom = self.dic()['atom']
 		traks = atom['moov']['trak']
@@ -213,6 +205,12 @@ class MP4(object):
 				sample['audio'] = out
 
 		return sample
+
+	#SAMPLE [ OFFSET, SIZE ]
+	def _get_sample_info(self, sample_num, stsc, stco, stsz):
+		chunk_offet = 1
+		sample_size = 2
+		return (chunk_offet, sample_size)
 
 	def _sampling(self, trak, offset, duration):
 		sample = []
@@ -235,47 +233,34 @@ class MP4(object):
 				keyframe.append(obj['sample-number'])
 
 		timescale = mdhd['timescale']
-		time = t_temp = 0
-		num = 1
-
+		time = 0
+		t_temp = 0
 		min = offset * timescale
 		max = (offset + duration) * timescale
-		pos = -1
-		chunk_offet = 0
+		sample_num = 1
+
 		for data in stts:
 			for n in range(data['count']):
 				#TODO : 2018-11-27
 				t_temp += data['delta']
 				if t_temp > max: break
 				if t_temp > min:
-
-					_pos = self._findChunkIndex(stsc, num) - 1
-
-					if _pos != pos:
-						pos = _pos
-						chunk_offet = stco[pos]['chunk_offset']
-
-					size = stsz[num - 1]['entry_size']
-
+					(chunk_offet, sample_size) = self._get_sample_info(sample_num, stsc, stco, stsz)
 					pack = {
-						"id": num,
+						"id": sample_num,
 						"type": str(type),
 						"time": time,
 						"timescale" : timescale,
 						"chunk_offset": chunk_offet,
-						"sample_size": size
+						"sample_size": sample_size
 					}
 
 					if keyframe:
-						pack['keyframe'] = num in keyframe
+						pack['keyframe'] = sample_num in keyframe
 
-					chunk_offet = chunk_offet + size
 					sample.append(pack)
-
 					time += data['delta']
-
-				num += 1
-
+				sample_num += 1
 		return sample
 
 	def _atom(self):

@@ -15,7 +15,7 @@ def _hex(byte):
 	bio.close()
 	return txt
 
-FH = open('./ts/BigBuckBunny-2.ts', 'rb')
+FH = open('./ts/BigBuckBunny-3.ts', 'rb')
 
 while True:
 	s = FH.read(4)

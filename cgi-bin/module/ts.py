@@ -44,16 +44,56 @@ class TS(MP4):
 		# 0		home
 		# 0		copyright_identification_bit
 		# 0		copyright_identification_start
-		# 00 0001 1101 000 aac_frame_length
-		# 1 1111 1111 11   adts_buffer_fullness
-		# 00	no_raw_data_blocks_inframe
+		# 00 0001 1101 000 aac_frame_length ( 13 )
+		# 1 1111 1111 11   adts_buffer_fullness (11)
+		# 00	no_raw_data_blocks_inframe		(2)
+		# none CRC ( cyclic redundancy check protection absent is 0 => 16 )
 		#FF F1 50 80 04 3F FC DE 04 00 00 6C 69 62 66 61 61 63 20 31 2E 32 38 00 00 42 00 93 20 04 32 00 47 ( 7 + 26 byte )
 		#         50           80 04 3F FC
 		#01 0100 0 010 0 0 0 0 00 0000 0100 001 11111111111 00 ( 33 )
 		#1111 1111
 		#0000 0010
+		adts = '111111111111'		#(12)
 		_len = len(data) + 7
-		print _len
+		_type = '0' #MPEG-4 (0), MPEG-2 (1)
+		_len = '{:013b}'.format(_len)
+		_channel = '{:03b}'.format(2)
+		_profile = '{:02b}'.format(1)
+		_sampling_frequency_index = '{:04b}'.format(4)
+
+		layer = '00'
+		protection_absent = '1'
+		private = '0'
+		originality = '0'
+		home = '0'
+		copyright_identification_bit = '0'
+		copyright_identification_start = '0'
+		adts_buffer_fullness = '11111111111'
+		no_raw_data_blocks_inframe = '00'
+
+		adts += _type
+		adts += layer
+		adts += protection_absent
+		adts += _profile
+		adts += _sampling_frequency_index
+		adts += private
+		adts += _channel
+		adts += originality
+		adts += home
+		adts += copyright_identification_bit
+		adts += copyright_identification_start
+		adts += _len
+		adts += adts_buffer_fullness
+		adts += no_raw_data_blocks_inframe
+
+		out = []
+		while adts:
+			(value, adts) =  (lambda t, n : (t[0:n], t[n:]))(adts, 8)
+			out.append(int('0b' + value, base=2))
+
+		#data = bytearray(out) + data
+
+		print self._hex(bytearray(out))
 		return data
 
 	def segment(self, seq, duration):
@@ -74,6 +114,8 @@ class TS(MP4):
 				sample = self.sample['audio'].pop(0)
 				offset = sample['chunk_offset']
 				size = sample['sample_size']
+				print "\n"
+				print (sample['id'])
 				data = self._ADTS(self._readFS(FH, offset, size))
 				print self._hex(data)
 
