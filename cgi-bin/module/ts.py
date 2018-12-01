@@ -124,4 +124,4 @@ class TS(MP4):
 		print 'buffer'
 
 if __name__ == '__main__':
-	TS('../../BigBuckBunny.mp4').segment(0, 1).ts()
+	TS('../../BigBuckBunny.mp4').segment(0, 10).ts()

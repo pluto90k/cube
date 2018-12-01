@@ -206,19 +206,36 @@ class MP4(object):
 
 		return sample
 
-	#SAMPLE [ OFFSET, SIZE ]
-	def _get_sample_info(self, sample_num, stsc, stco, stsz):
-		chunk_offet = 1
-		sample_size = 2
-		return (chunk_offet, sample_size)
-
 	def _make_sample_info(self, stsc, stco, stsz):
 		info = []
-		sample = {
-			"offet":1,
-			"size":1
-		}
-		info.append(sample)
+		pos = 0
+		count = stsc[pos]['sample_per_chunk']
+		index = stsc[pos]['first_chunk_index']
+		offset = stco[index - 1]['chunk_offset']
+		for num in range(len(stsz)):
+			size = stsz[num]['entry_size']
+			#FIND OFFSET
+			if num == count: # pos start 1, array start 0
+				pos += 1 #stsc next position
+				if index + 1 < stsc[pos]['first_chunk_index']:
+					pos -= 1	#stsc current position
+					index += 1
+				else:
+					index = stsc[pos]['first_chunk_index']
+
+				offset = stco[index - 1]['chunk_offset']
+				count += stsc[pos]['sample_per_chunk']
+
+			sample = {
+				# pos start 1, array start 0
+				"offet":offset,
+				#array start 0
+				"size":size
+			}
+			#offet is move by sample size
+			offset += size
+			info.append(sample)
+
 		return info
 
 	def _make_sample_keyframe_info(self, stbl):
@@ -247,7 +264,6 @@ class MP4(object):
 
 		timescale = mdhd['timescale']
 		a_time = 0	#TOTAL TIME
-
 		time = 0	#TS TIME
 		min = offset * timescale
 		max = (offset + duration) * timescale
@@ -259,15 +275,13 @@ class MP4(object):
 				a_time += data['delta']
 				if a_time > max: break
 				if a_time > min:
-					(chunk_offet, sample_size) = self._get_sample_info(sample_num, stsc, stco, stsz)
-
 					pack = {
 						"id": sample_num,
 						"type": str(type),
 						"time": time,
 						"timescale" : timescale,
-						"chunk_offset": chunk_offet,
-						"sample_size": sample_size
+						"chunk_offset": sample_info[sample_num]['offet'],
+						"sample_size": sample_info[sample_num]['size']
 					}
 
 					if keyframe:
@@ -284,16 +298,17 @@ class MP4(object):
 		FH = open(self.fileName, 'rb')
 		dic = {}
 		size = 4
-		s = FH.read(size)
-		l = self._int(s)
+		data = FH.read(size)
+		length = self._int(data)
 
 		while True:
-			s = FH.read(l-size)
-			head = self._str(s[:4])
-			self._parser(head, dic, s[4:])
-			s = FH.read(size)
-			if s == '': break
-			l = self._int(s[:4])
+			head = self._str(FH.read(size))		#TYPE
+			#if head == 'mdat':break			#Do not need!
+			data = FH.read(length - len(data) - size)	#ALL - LEN(4) - TYPE(4)
+			self._parser(head, dic, data)		#PARSER
+			data = FH.read(size)				#READ LEN(4)
+			if data == '': break				#NONE
+			length = self._int(data)				#LEN(4) BYTE TO INT
 
 		FH.close()
 		return dic
@@ -569,5 +584,4 @@ class MP4(object):
 		}
 
 if __name__ == '__main__':
-	for trak in MP4('../../BigBuckBunny.mp4').dic()['atom']['moov']['trak']:
-		print trak['mdia']['minf']['stbl']['stss']
+	MP4('../../BigBuckBunny.mp4').dic()
