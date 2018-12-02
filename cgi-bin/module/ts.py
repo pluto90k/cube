@@ -3,6 +3,7 @@
 
 import re
 from mp4 import MP4
+from io import BytesIO
 
 class TS(MP4):
 	def __init__(self, file_name):
@@ -229,6 +230,69 @@ class TS(MP4):
 		pmt = pmt + body
 		return pmt
 
+	def _TS(self, pid, data):
+		return data
+
+	def _PES(self, type, data, pts = 0, dts = 0):
+		###############################################
+		# Packetized Elementary Stream
+		###############################################
+		if type == 'video':
+			type = 0xE0
+		elif type == 'audio':
+			type = 0xC0
+
+		pes = bytearray([0x00, 0x00, 0x01])		#packet_start_code_prefix
+		pes += bytearray([type])		#packet_start_code_prefix
+
+		body = bytearray([])
+		body_len = '{:016b}'.format(len(body))
+		body_len = self._bit_to_bytearray(body_len)
+		body = body_len + body
+
+		option = '10'		#Marker bits
+		option += '00'		#Scrambling control
+		option += '0'		#Priority
+		option += '0'		#Data alignment indicator
+		option += '0'		#Copyright
+		option += '0'		#Original or Copy
+
+		option += '11' if dts else '10'	#10 only PTS | 00 no PTS or DTS | 01 is forbidden ( 2Bits )
+		option += '0'		#ESCR flage
+		option += '0'		#ES rate flag
+		option += '0'		#DSM trick mode flag
+		option += '0'		#Additional copy info flag
+		option += '0'		#CRC Flag
+		option += '0'		#Extension Flag
+
+		PTS_TIME = '{:030b}'.format(pts)
+		PTS = '0011' if dts else '0010'
+		PTS += '000'
+		PTS += '1'
+		PTS += PTS_TIME[0:15]
+		PTS += '1'
+		PTS += PTS_TIME[15:]
+		PTS += '1'
+
+		DTS = ''
+		if dts:
+			PTS_TIME = '{:030b}'.format(dts)
+			DTS = '0001'
+			DTS += '000'
+			DTS += '1'
+			DTS += PTS_TIME[0:15]
+			DTS += '1'
+			DTS += PTS_TIME[15:]
+			DTS += '1'
+
+		info = self._bit_to_bytearray(PTS + DTS)
+		option += '{:08b}'.format(len(info))
+
+		option  = self._bit_to_bytearray(option)
+
+		pes = pes + body + option + info
+		return pes + data
+
 	def segment(self, seq, duration):
 		timeoffset = seq * duration
 		self.sample = self._sample(timeoffset, duration)
@@ -236,26 +300,45 @@ class TS(MP4):
 
 	def ts(self):
 		FH = open(self.fileName, 'rb')
-		while self.sample['video'] or self.sample['audio']:
-			if self.sample['video']:
-				sample = self.sample['video'].pop(0)
-				offset = sample['chunk_offset']
-				size = sample['sample_size']
-				data = self._AUD(self._readFS(FH, offset, size))
+		bio = BytesIO()
+		bio.write(self._SDT())
 
-			if self.sample['audio']:
-				sample = self.sample['audio'].pop(0)
-				offset = sample['chunk_offset']
-				size = sample['sample_size']
-				print "\n"
-				print (sample['id'])
-				data = self._ADTS(self._readFS(FH, offset, size))
-				print self._hex(data)
+		while self.sample['video']:
+			sample = self.sample['video'].pop(0)
+			offset = sample['chunk_offset']
+			size = sample['sample_size']
+			data = self._AUD(self._readFS(FH, offset, size))
+			pts = 171000
+			dts = 159750
+			data = self._PES('video', data, pts, dts)
 
-		return
-	def buffer(self):
-		print 'buffer'
+		while self.sample['audio']:
+			sample = self.sample['audio'].pop(0)
+			offset = sample['chunk_offset']
+			size = sample['sample_size']
+			data = self._ADTS(self._readFS(FH, offset, size))
+
+		bio.seek(0)
+		return bio
+
+def _hex(byte):
+	bio = BytesIO(byte)
+	txt = ''
+	while True:
+		s = bio.read(1)
+		if s == '': break
+		txt = txt + '%02X ' % int(ord(s))
+	bio.close()
+	return txt
 
 if __name__ == '__main__':
-	#TS('../../BigBuckBunny.mp4').segment(0, 10).ts()
-	TS('../../BigBuckBunny.mp4')._PMT()
+	#TS('../../BigBuckBunny.mp4')._PES('video', '', 171000, 159750)
+	bio = TS('../../BigBuckBunny.mp4').segment(0, 10).ts()
+	while True:
+		s = bio.read(4)
+		if s == '': break
+		print _hex(s)
+		s = bio.read(184)
+		print _hex(s)
+
+	bio.close()
