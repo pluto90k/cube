@@ -267,7 +267,7 @@ class MP4(object):
 		time = 0	#TS TIME
 		min = offset * timescale
 		max = (offset + duration) * timescale
-		sample_num = 1
+		sample_num = 0
 
 		for data in stts:
 			for n in range(data['count']):
