@@ -148,7 +148,7 @@ class TS(MP4):
 		sdt = sdt + body
 		return sdt
 
-	def _PAT(self, pmt_num = 4096):
+	def _PAT(self, pmt_num = 0x1000):
 		###############################################
 		# Program Association Table
 		###############################################
@@ -230,10 +230,7 @@ class TS(MP4):
 		pmt = pmt + body
 		return pmt
 
-	def _TS(self, pid, data):
-		return data
-
-	def _PES(self, type, data, pts = 0, dts = 0):
+	def _PES(self, type, config=''):
 		###############################################
 		# Packetized Elementary Stream
 		###############################################
@@ -250,48 +247,105 @@ class TS(MP4):
 		body_len = self._bit_to_bytearray(body_len)
 		body = body_len + body
 
-		option = '10'		#Marker bits
-		option += '00'		#Scrambling control
-		option += '0'		#Priority
-		option += '0'		#Data alignment indicator
-		option += '0'		#Copyright
-		option += '0'		#Original or Copy
+		option = ''
+		if config:
+			pts = config['pts']
+			dts = config['dts']
+			option = '10'		#Marker bits
+			option += '00'		#Scrambling control
+			option += '0'		#Priority
+			option += '0'		#Data alignment indicator
+			option += '0'		#Copyright
+			option += '0'		#Original or Copy
 
-		option += '11' if dts else '10'	#10 only PTS | 00 no PTS or DTS | 01 is forbidden ( 2Bits )
-		option += '0'		#ESCR flage
-		option += '0'		#ES rate flag
-		option += '0'		#DSM trick mode flag
-		option += '0'		#Additional copy info flag
-		option += '0'		#CRC Flag
-		option += '0'		#Extension Flag
+			option += '11' if dts else '10'	#10 only PTS | 00 no PTS or DTS | 01 is forbidden ( 2Bits )
+			option += '0'		#ESCR flage
+			option += '0'		#ES rate flag
+			option += '0'		#DSM trick mode flag
+			option += '0'		#Additional copy info flag
+			option += '0'		#CRC Flag
+			option += '0'		#Extension Flag
 
-		PTS_TIME = '{:030b}'.format(pts)
-		PTS = '0011' if dts else '0010'
-		PTS += '000'
-		PTS += '1'
-		PTS += PTS_TIME[0:15]
-		PTS += '1'
-		PTS += PTS_TIME[15:]
-		PTS += '1'
+			PTS_TIME = '{:030b}'.format(pts)
+			PTS = '0011' if dts else '0010'
+			PTS += '000'
+			PTS += '1'
+			PTS += PTS_TIME[0:15]
+			PTS += '1'
+			PTS += PTS_TIME[15:]
+			PTS += '1'
 
-		DTS = ''
-		if dts:
-			PTS_TIME = '{:030b}'.format(dts)
-			DTS = '0001'
-			DTS += '000'
-			DTS += '1'
-			DTS += PTS_TIME[0:15]
-			DTS += '1'
-			DTS += PTS_TIME[15:]
-			DTS += '1'
+			DTS = ''
+			if dts:
+				PTS_TIME = '{:030b}'.format(dts)
+				DTS = '0001'
+				DTS += '000'
+				DTS += '1'
+				DTS += PTS_TIME[0:15]
+				DTS += '1'
+				DTS += PTS_TIME[15:]
+				DTS += '1'
 
-		info = self._bit_to_bytearray(PTS + DTS)
-		option += '{:08b}'.format(len(info))
+			info = self._bit_to_bytearray(PTS + DTS)
+			option += '{:08b}'.format(len(info))
+			option = self._bit_to_bytearray(option)
+			option += info
 
-		option  = self._bit_to_bytearray(option)
+		pes = pes + body + option
+		return pes
 
-		pes = pes + body + option + info
-		return pes + data
+	def _AF(self, config=''):
+		af = []
+
+		if not config:
+			return bytearray(af)
+
+		pcr = config.get('pcr', None)
+
+		body = '0'						#discontinuity_indicator
+		body += '1'						#random_access_indicator
+		body += '0'						#elementary_system_priority_indicator
+		body += '1' if pcr else '0'		#PCR_Flag
+		body += '0'						#OPCR_Flag
+		body += '0'						#SPF
+		body += '0'						#transport_private_data_flag
+		body += '0'						#adaptation_field_extension_flag
+		body += '{:033b}'.format(pcr)	#Base
+		body += '111111'				#reservation
+		body += '{:09b}'.format(0)		#Extension
+
+		body = self._bit_to_bytearray(body)
+		body_len = '{:08b}'.format(len(body))
+		body_len = self._bit_to_bytearray(body_len)
+		return body_len + body
+
+	def _TS(self, pid, count, afdata='', pesdata='', data=''):
+		ts = bytearray([0x47])
+		body = '0'
+		body += '1'	if pesdata else '0'
+		body += '0'
+		body += '{:013b}'.format(pid)
+		body += '00'			#Not Scrambled
+		body += '11' if afdata else '01'
+		body += '{:04b}'.format(count)
+		body = self._bit_to_bytearray(body)
+		ts += body
+
+		if not data:
+			count = len(ts)
+			count += len(afdata)
+			count += len(pesdata)
+			count = 188 - count
+			data = bytearray([0xFF] * count)
+
+		if not pesdata:
+			count = len(ts)
+			count += len(afdata)
+			count += len(pesdata)
+			count = 188 - count
+			pesdata = bytearray([0xFF] * count)
+
+		return ts + afdata + pesdata + data
 
 	def segment(self, seq, duration):
 		timeoffset = seq * duration
@@ -301,22 +355,42 @@ class TS(MP4):
 	def ts(self):
 		FH = open(self.fileName, 'rb')
 		bio = BytesIO()
-		bio.write(self._SDT())
 
-		while self.sample['video']:
-			sample = self.sample['video'].pop(0)
-			offset = sample['chunk_offset']
-			size = sample['sample_size']
-			data = self._AUD(self._readFS(FH, offset, size))
-			pts = 171000
-			dts = 159750
-			data = self._PES('video', data, pts, dts)
+		pmt_num = 0x1000
+		pcr_pid = video_pid = 0x100
+		audio_pid = 0x101
 
-		while self.sample['audio']:
-			sample = self.sample['audio'].pop(0)
-			offset = sample['chunk_offset']
-			size = sample['sample_size']
-			data = self._ADTS(self._readFS(FH, offset, size))
+		bio.write(self._TS(0x11, 0, self._AF(), self._SDT(), ''))
+		bio.write(self._TS(0, 0, self._AF(), self._PAT(pmt_num), ''))
+		bio.write(self._TS(pmt_num, 0, self._AF(), self._PMT(pcr_pid, video_pid, audio_pid), ''))
+
+		v_count = 0
+		a_count = 0
+		while self.sample['video'] or self.sample['audio']:
+			if self.sample['video']:
+				sample = self.sample['video'].pop(0)
+				offset = sample['chunk_offset']
+				size = sample['sample_size']
+
+				af = self._AF({'pcr':63000})
+				pes = self._PES('video',{'pts':171000,'dts':159750})
+
+				data = self._readFS(FH, offset, size)
+				data = self._AUD(data)
+
+				total_len = len(af) + len(pes) + len(data)
+
+				if total_len > 184:
+					sp_len = 184 - (len(af) + len(pes))
+					data = self._TS(video_pid, v_count, af, pes, data[:sp_len])
+					v_count += 1
+					bio.write(data)
+				break
+			if self.sample['audio']:
+				sample = self.sample['audio'].pop(0)
+				offset = sample['chunk_offset']
+				size = sample['sample_size']
+				data = self._ADTS(self._readFS(FH, offset, size))
 
 		bio.seek(0)
 		return bio
