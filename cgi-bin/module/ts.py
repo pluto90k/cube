@@ -301,22 +301,33 @@ class TS(MP4):
 			return bytearray(af)
 
 		pcr = config.get('pcr', None)
+		stuffing = config.get('stuffing', None)
+		body = ''
+		body_len = ''
 
-		body = '0'						#discontinuity_indicator
-		body += '1'						#random_access_indicator
-		body += '0'						#elementary_system_priority_indicator
-		body += '1' if pcr else '0'		#PCR_Flag
-		body += '0'						#OPCR_Flag
-		body += '0'						#SPF
-		body += '0'						#transport_private_data_flag
-		body += '0'						#adaptation_field_extension_flag
-		body += '{:033b}'.format(pcr)	#Base
-		body += '111111'				#reservation
-		body += '{:09b}'.format(0)		#Extension
+		if pcr:
+			body += '0'						#discontinuity_indicator
+			body += '1'						#random_access_indicator
+			body += '0'						#elementary_system_priority_indicator
+			body += '1' if pcr else '0'		#PCR_Flag
+			body += '0'						#OPCR_Flag
+			body += '0'						#SPF
+			body += '0'						#transport_private_data_flag
+			body += '0'						#adaptation_field_extension_flag
+			body += '{:033b}'.format(pcr)	#Base
+			body += '111111'				#reservation
+			body += '{:09b}'.format(0)		#Extension
+			body = self._bit_to_bytearray(body)
 
-		body = self._bit_to_bytearray(body)
-		body_len = '{:08b}'.format(len(body))
-		body_len = self._bit_to_bytearray(body_len)
+		if stuffing:
+			stuffing = stuffing - 2 - len(body)
+			body += bytearray([0x00])
+			body += bytearray([0xFF] * stuffing)
+
+		if body:
+			body_len = '{:08b}'.format(len(body))
+			body_len = self._bit_to_bytearray(body_len)
+
 		return body_len + body
 
 	def _TS(self, pid, count, afdata='', pesdata='', data=''):
@@ -338,19 +349,19 @@ class TS(MP4):
 			count = 188 - count
 			data = bytearray([0xFF] * count)
 
-		if not pesdata:
-			count = len(ts)
-			count += len(afdata)
-			count += len(pesdata)
-			count = 188 - count
-			pesdata = bytearray([0xFF] * count)
-
 		return ts + afdata + pesdata + data
+
+	def _ts_count(self, count):
+		count += 1
+		if count > 15: count = 0
+		return count
 
 	def segment(self, seq, duration):
 		timeoffset = seq * duration
 		self.sample = self._sample(timeoffset, duration)
 		return self
+
+
 
 	def ts(self):
 		FH = open(self.fileName, 'rb')
@@ -360,32 +371,62 @@ class TS(MP4):
 		pcr_pid = video_pid = 0x100
 		audio_pid = 0x101
 
-		bio.write(self._TS(0x11, 0, self._AF(), self._SDT(), ''))
-		bio.write(self._TS(0, 0, self._AF(), self._PAT(pmt_num), ''))
-		bio.write(self._TS(pmt_num, 0, self._AF(), self._PMT(pcr_pid, video_pid, audio_pid), ''))
+		#bio.write(self._TS(0x11, 0, self._AF(), self._SDT(), ''))
+		#bio.write(self._TS(0, 0, self._AF(), self._PAT(pmt_num), ''))
+		#bio.write(self._TS(pmt_num, 0, self._AF(), self._PMT(pcr_pid, video_pid, audio_pid), ''))
 
 		v_count = 0
 		a_count = 0
+
+		test = 0
 		while self.sample['video'] or self.sample['audio']:
 			if self.sample['video']:
 				sample = self.sample['video'].pop(0)
 				offset = sample['chunk_offset']
 				size = sample['sample_size']
 
+				data = self._readFS(FH, offset, size)
+				data = self._AUD(data)
+
 				af = self._AF({'pcr':63000})
 				pes = self._PES('video',{'pts':171000,'dts':159750})
 
-				data = self._readFS(FH, offset, size)
-				data = self._AUD(data)
+				if test == 1:
+					af = ''
 
 				total_len = len(af) + len(pes) + len(data)
 
 				if total_len > 184:
 					sp_len = 184 - (len(af) + len(pes))
-					data = self._TS(video_pid, v_count, af, pes, data[:sp_len])
-					v_count += 1
-					bio.write(data)
-				break
+					bio.write(self._TS(video_pid, v_count, af, pes, data[:sp_len]))
+					data = data[sp_len:]
+					pes = ''						#PES CLEAR
+					v_count = self._ts_count(v_count)
+					total_len = len(data)
+				else:
+					sp_len = (len(pes) + len(data)) - 184
+					af = self._AF({'pcr':70500, 'stuffing':0 if sp_len >= 0 else sp_len * -1 })
+					sp_len = 184 - (len(af) + len(pes))
+					bio.write(self._TS(video_pid, v_count, af, pes, data[:sp_len]))
+					data = data[sp_len:]
+					v_count = self._ts_count(v_count)
+					total_len = len(data)
+
+				while total_len > 0:
+					sp_len = (len(pes) + len(data)) - 184
+					af = self._AF({'stuffing':0 if sp_len >= 0 else sp_len * -1 })
+					sp_len = 184 - (len(af) + len(pes))
+					bio.write(self._TS(video_pid, v_count, af, pes, data[:sp_len]))
+					data = data[sp_len:]
+					v_count = self._ts_count(v_count)
+					total_len = len(data)
+
+				if test == 2:
+					break
+				else:
+					test += 1
+					continue
+
 			if self.sample['audio']:
 				sample = self.sample['audio'].pop(0)
 				offset = sample['chunk_offset']
