@@ -371,9 +371,9 @@ class TS(MP4):
 		pcr_pid = video_pid = 0x100
 		audio_pid = 0x101
 
-		#bio.write(self._TS(0x11, 0, self._AF(), self._SDT(), ''))
-		#bio.write(self._TS(0, 0, self._AF(), self._PAT(pmt_num), ''))
-		#bio.write(self._TS(pmt_num, 0, self._AF(), self._PMT(pcr_pid, video_pid, audio_pid), ''))
+		bio.write(self._TS(0x11, 0, self._AF(), self._SDT(), ''))
+		bio.write(self._TS(0, 0, self._AF(), self._PAT(pmt_num), ''))
+		bio.write(self._TS(pmt_num, 0, self._AF(), self._PMT(pcr_pid, video_pid, audio_pid), ''))
 
 		v_count = 0
 		a_count = 0
