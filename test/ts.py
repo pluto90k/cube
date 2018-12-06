@@ -34,6 +34,7 @@ while True:
 	#print _hex(s)
 	if s[:3] == bytearray([0x47, 0x40, 0x11]):
 		#print 'sdt [%s]' % _hex(s)
+		print 'sdt {}'.format(sdt_count)
 		s = FH.read(184)
 		if not sdt:
 			sdt = s
@@ -47,6 +48,7 @@ while True:
 		continue
 	elif s[:3] == bytearray([0x47, 0x40, 0x00]):
 		#print 'pat [%s]' % _hex(s)
+		print 'pat'
 		s = FH.read(184)
 		if not pat:
 			pat = s
@@ -58,6 +60,7 @@ while True:
 		continue
 	elif s[:3] == bytearray([0x47, 0x50, 0x00]):
 		#print 'pmt [%s]' % _hex(s)
+		print 'pmt {}'.format(count)
 		s = FH.read(184)
 		if not pmt:
 			pmt = s
@@ -84,7 +87,7 @@ while True:
 			for b in data[2:8]:
 				value += '{:08b}'.format(int(ord(b)))
 
-			out = 'PCR [%d]' % int(value[:33], base=2)
+			out = ' PCR [%d]' % int(value[:33], base=2)
 			#print 'len %d %s' % (int('{:08b}'.format(int(ord(data[:1]))), base=2), _hex(data[int('{:08b}'.format(int(ord(data[:1]))), base=2) + 1:]))
 			data = data[int('{:08b}'.format(int(ord(data[:1]))), base=2) + 1:]
 			if  data[6:8] == bytearray([0x80, 0xC0]):
@@ -113,7 +116,7 @@ while True:
 		elif org:
 			if data[:4] == bytearray([0x00, 0x00, 0x01, 0xE0]):
 				#out = 'PES %s, %s' % (_hex(data[:6]), _hex(data[6:8]))
-				out = 'PES'
+				out = ' PES'
 				if  data[6:8] == bytearray([0x80, 0xC0]):
 					pts = data[10:14]
 					value = ''
@@ -139,7 +142,7 @@ while True:
 				print out
 			else:
 				#out = 'A PES %s' % _hex(data[:6])
-				out = 'A PES'
+				out = ' A PES'
 				data = data[int('{:08b}'.format(int(ord(data[:1]))), base=2) + 1:]
 				if  data[6:8] == bytearray([0x80, 0xC0]):
 					pts = data[10:14]
