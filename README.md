@@ -38,7 +38,7 @@ curl -i http://localhost:8000/cgi-bin/cube.py?file=BigBuckBunny.m3u8
 
 ### TS (Transport Stream) Download
 
-wget -O BigBuckBunny(-([0-9]+)).ts http://localhost:8000/cgi-bin/cube.py?file=BigBuckBunny.ts?seq=([0-9]+)&duration=([0-9]+)
+wget -O BigBuckBunny(-([0-9]+)).ts http://localhost:8000/cgi-bin/cube.py?file=BigBuckBunny.ts&seq=([0-9]+)&duration=([0-9]+)
 
 
 ### Nginx Proxy Setting

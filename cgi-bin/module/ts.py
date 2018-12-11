@@ -386,6 +386,7 @@ class TS(MP4):
 				size = sample['sample_size']
 
 				data = self._readFS(FH, offset, size)
+				
 				data = self._AUD(data)
 
 				af = self._AF({'pcr':63000})

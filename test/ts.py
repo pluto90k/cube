@@ -3,7 +3,12 @@
 from io import BytesIO
 
 #TS PARSER ( How To make ts format? )
-
+_PCR = 0
+_VPTS = 0
+_VDTS = 0
+_APTS = 0
+def bytes2int(str):
+	return int(str.encode('hex'), 16)
 
 def _hex(byte):
 	bio = BytesIO(byte)
@@ -21,150 +26,101 @@ def _bit_to_bytearray(data):
 		out.append(int('0b' + value, base=2))
 	return bytearray(out)
 
-FH = open('./ts/BigBuckBunny-1.ts', 'rb')
-count = 0
-pat = ''
-sdt = ''
-pmt = ''
-sdt_count = 0
-org = False
-while True:
-	s = FH.read(4)
-	if s == '': break
-	#print _hex(s)
-	if s[:3] == bytearray([0x47, 0x40, 0x11]):
-		#print 'sdt [%s]' % _hex(s)
-		print 'sdt {}'.format(sdt_count)
-		s = FH.read(184)
-		if not sdt:
-			sdt = s
-		elif sdt == s:
-			pass
-			#print 'sdt same'
-		else:
-			print _hex(s)
-		#print ("{}".format(sdt_count))
-		sdt_count = 0
-		continue
-	elif s[:3] == bytearray([0x47, 0x40, 0x00]):
-		#print 'pat [%s]' % _hex(s)
-		print 'pat'
-		s = FH.read(184)
-		if not pat:
-			pat = s
-		elif pat == s:
-			pass
-			#print 'pat same'
-		else:
-			print _hex(s)
-		continue
-	elif s[:3] == bytearray([0x47, 0x50, 0x00]):
-		#print 'pmt [%s]' % _hex(s)
-		print 'pmt {}'.format(count)
-		s = FH.read(184)
-		if not pmt:
-			pmt = s
-		elif pmt == s:
-			pass
-			#print 'pmt same'
-		else:
-			print _hex(s)
-		#print ("{}".format(count))
-		count = 0
-		continue
-	else:
-		if s[:3] == bytearray([0x47, 0x41, 0x00]):	#Video
-			org = True
+def _time(data):
+	value = ''
+	for b in data:
+		value += '{:08b}'.format(int(ord(b)))
+	return int(value[:15] + value[16:-1], base=2)
 
-		count += 1
-		sdt_count += 1
-		#print ("{}".format(count))
+def _move(start, end, pos):
+	return (start, end)
 
-	data = FH.read(184)
-	if org :
-		if s[3:] >= bytearray([0x30]) and data[1:2] != bytearray([0xFF]) and '{:08b}'.format(int(ord(data[1:2])))[3:4] == '1':
-			value = ''
-			for b in data[2:8]:
-				value += '{:08b}'.format(int(ord(b)))
+def _pcr_parser(adptF):
+	data = adptF.read(6)
+	value = ''
+	for b in data:
+		value += '{:08b}'.format(int(ord(b)))
+	return int(value[:33], base=2)
 
-			out = ' PCR [%d]' % int(value[:33], base=2)
-			#print 'len %d %s' % (int('{:08b}'.format(int(ord(data[:1]))), base=2), _hex(data[int('{:08b}'.format(int(ord(data[:1]))), base=2) + 1:]))
-			data = data[int('{:08b}'.format(int(ord(data[:1]))), base=2) + 1:]
-			if  data[6:8] == bytearray([0x80, 0xC0]):
-				pts = data[10:14]
-				value = ''
-				for b in pts:
-					value += '{:08b}'.format(int(ord(b)))
-				pts = int(value[:15] + value[16:-1], base=2)
+def _pes_parser(body, pcr=None):
+	global _PCR, _VPTS, _VDTS, _APTS
+	_hex(body.read(3))		#PES	Prefix
+	streamId = body.read(1)	#PES	Stream ID
+	streamId = 'video' if streamId == bytearray([0xE0]) else 'audio'
+	_hex(body.read(2))		#PES	Packet Length
+	_hex(body.read(2))		#PES OPTION
+	_hex(body.read(1))		#PES Header Length
+	type = body.read(1)
 
-				dts = data[15:19]
-				value = ''
-				for b in dts:
-					value += '{:08b}'.format(int(ord(b)))
+	if pcr:
+		print "PCR : [%d] | GAP [%d]" % (pcr, pcr - _PCR if _PCR != 0 else 0)
+		_PCR = pcr
 
-				dts = int(value[:15] + value[16:-1], base=2)
-				out += ' PTS (%d), DTS (%d), GAP (%d)' % (pts, dts, pts - dts)
-			elif data[6:8] == bytearray([0x80, 0x80]):
-				pts = data[10:14]
-				value = ''
-				for b in pts:
-					value += '{:08b}'.format(int(ord(b)))
-				pts = int(value[:15] + value[16:-1], base=2)
-				out += ' PTS (%d)' %  (pts)
+	if type == bytearray([0x21]):
+		pts = body.read(4)
+		pts = _time(pts)
+		if streamId == 'audio':
+			print "PTS : [%d] | GAP [%d] | [%s]" % (pts, pts - _APTS if _APTS != 0 else 0, streamId)		#only pts
+			_APTS = pts
+		else :
+			print "PTS : [%d] | GAP [%d] | [%s]" % (pts, pts - _VPTS if _VPTS != 0 else 0, streamId)		#only pts
+			_VPTS = pts
 
-			print out
-		elif org:
-			if data[:4] == bytearray([0x00, 0x00, 0x01, 0xE0]):
-				#out = 'PES %s, %s' % (_hex(data[:6]), _hex(data[6:8]))
-				out = ' PES'
-				if  data[6:8] == bytearray([0x80, 0xC0]):
-					pts = data[10:14]
-					value = ''
-					for b in pts:
-						value += '{:08b}'.format(int(ord(b)))
-					pts = int(value[:15] + value[16:-1], base=2)
+	elif type == bytearray([0x31]):
+		pts = body.read(4)
+		pts = _time(pts)
+		type = body.read(1)
+		dts = body.read(4)
+		dts = _time(dts)
+		if streamId == 'audio':
+			print "PTS : [%d] | GAP [%d] | [%s]" % (pts, pts - _APTS if _APTS != 0 else 0, streamId)		#only pts
+			_APTS = pts
+		else :
+			print "PTS : [%d] | DTS [%d] | VGAP [%d] | DGAP [%d] | [%s]" % (pts, dts, pts - _VPTS if _VPTS != 0 else 0, dts - _VDTS if _VDTS != 0 else 0, streamId),		#only pts
+			print "(PTS-DTS) [%d] | (PTS-PCR) [%d] | (DTS-PCR) [%d]" % (pts - dts, pts - _PCR, dts - _PCR)		#only pts
+			_VPTS = pts
+			_VDTS = dts
 
-					dts = data[15:19]
-					value = ''
-					for b in dts:
-						value += '{:08b}'.format(int(ord(b)))
-
-					dts = int(value[:15] + value[16:-1], base=2)
-					out += ' PTS:%d, DTS:%d, GAP:%d' % (pts, dts, pts - dts)
-				elif data[6:8] == bytearray([0x80, 0x80]):
-					pts = data[10:14]
-					value = ''
-					for b in pts:
-						value += '{:08b}'.format(int(ord(b)))
-					pts = int(value[:15] + value[16:-1], base=2)
-					out += ' PTS:%d' %  (pts)
-
-				print out
+def _ts_parser(head, body):
+	body = BytesIO(body)
+	if head[:3] == bytearray([0x47, 0x41, 0x00]):		#Video
+		#print _hex(head)
+		if head[3] >= bytearray([0x30]):				#Has Adaptation Field
+			size = int('{:08b}'.format(int(ord(body.read(1)))), base=2)
+			if size:
+				adptF = BytesIO(body.read(size))
+				if '{:08b}'.format(int(ord(adptF.read(1))))[3:4] == '1':#PCR
+					_pes_parser(body, _pcr_parser(adptF))
+				else:
+					_pes_parser(body)
 			else:
-				#out = 'A PES %s' % _hex(data[:6])
-				out = ' A PES'
-				data = data[int('{:08b}'.format(int(ord(data[:1]))), base=2) + 1:]
-				if  data[6:8] == bytearray([0x80, 0xC0]):
-					pts = data[10:14]
-					value = ''
-					for b in pts:
-						value += '{:08b}'.format(int(ord(b)))
-					pts = int(value[:15] + value[16:-1], base=2)
-
-					dts = data[15:19]
-					value = ''
-					for b in dts:
-						value += '{:08b}'.format(int(ord(b)))
-
-					dts = int(value[:15] + value[16:-1], base=2)
-					out += ' PTS:%d, DTS:%d, GAP:%d' % (pts, dts, pts - dts)
-				elif data[6:8] == bytearray([0x80, 0x80]):
-					pts = data[10:14]
-					value = ''
-					for b in pts:
-						value += '{:08b}'.format(int(ord(b)))
-					pts = int(value[:15] + value[16:-1], base=2)
-					out += ' PTS:%d' %  (pts)
-			#print _hex(data)
-
-	org = False
+				_pes_parser(body)
+		else:											#Original Feild
+			_pes_parser(body)
+	elif head[:3] == bytearray([0x47, 0x41, 0x01]):		#Audio
+		#print _hex(head)
+		if head[3] >= bytearray([0x30]):				#Has Adaptation Field
+			size = int('{:08b}'.format(int(ord(body.read(1)))), base=2)
+			_hex(body.read(size))
+			_pes_parser(body)
+		else:
+			#print 'DATA'
+			pass
+	elif head[:3] == bytearray([0x47, 0x40, 0x11]):
+		#print 'SDT'	#Service Description Table
+		pass
+	elif head[:3] == bytearray([0x47, 0x40, 0x00]):
+		#print 'PAT'	#Program Association Table
+		pass
+	elif head[:3] == bytearray([0x47, 0x50, 0x00]):
+		#print 'PMT'	#Program Map Table
+		pass
+	else:
+		#print 'DATA'
+		pass
+FH = open('./ts/BigBuckBunny-1.ts', 'rb')
+while True:
+	head = FH.read(4)
+	if head == '': break
+	body = FH.read(184)
+	_ts_parser(head, body)

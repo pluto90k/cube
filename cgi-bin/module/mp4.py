@@ -584,4 +584,4 @@ class MP4(object):
 		}
 
 if __name__ == '__main__':
-	MP4('../../BigBuckBunny.mp4').dic()
+	print MP4('../../BigBuckBunny.mp4').dic()
