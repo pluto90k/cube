@@ -359,7 +359,47 @@ class TS(MP4):
 	def segment(self, seq, duration):
 		timeoffset = seq * duration
 		self.sample = self._sample(timeoffset, duration)
+		print self.sample['video']['info']
+		print self.sample['audio']['info']
 		return self
+
+	def test(self):
+		t = 0
+		c = 0
+		FH = open(self.fileName, 'rb')
+		while self.sample['video']['sample'] or self.sample['audio']['sample']:
+			if self.sample['video']['sample']:
+				sample = self.sample['video']['sample'].pop(0)
+				offset = sample['chunk_offset']
+				size = sample['sample_size']
+				data = self._readFS(FH, offset, size)
+				bio = BytesIO(data)
+				_len = bio.read(4)
+				_len = self._int(_len)
+				_data = bio.read(_len)
+				_d = _data[0]
+				print (_len)
+				print '{:08b}'.format(int(self._hex(_d), base=16))
+				print (self._hex(_data))
+
+			if self.sample['audio']['sample']:
+				sample = self.sample['audio']['sample'].pop(0)
+				#print (sample)
+				offset = sample['chunk_offset']
+				size = sample['sample_size']
+				data = self._readFS(FH, offset, size)
+				#data = self._ADTS(self._readFS(FH, offset, size))
+				t += len(data)
+				c += 1
+				#if c <= 16:
+				#	print (t)
+				#	print (self._hex(data))
+				#if c > 16 and c <= 31:
+				#	print (self._hex(data))
+				#if t == 33473:
+				#
+
+				#print (t)
 
 
 
@@ -379,14 +419,18 @@ class TS(MP4):
 		a_count = 0
 
 		test = 0
-		while self.sample['video'] or self.sample['audio']:
-			if self.sample['video']:
-				sample = self.sample['video'].pop(0)
+		s = 0
+		while self.sample['video']['sample'] or self.sample['audio']['sample']:
+			if self.sample['video']['sample']:
+				sample = self.sample['video']['sample'].pop(0)
+				s += sample['sample_size']
+				print sample
+				print 'c: [%d] s:[%d]' %(test, s)
 				offset = sample['chunk_offset']
 				size = sample['sample_size']
 
 				data = self._readFS(FH, offset, size)
-				
+
 				data = self._AUD(data)
 
 				af = self._AF({'pcr':63000})
@@ -422,14 +466,14 @@ class TS(MP4):
 					v_count = self._ts_count(v_count)
 					total_len = len(data)
 
-				if test == 2:
+				if test == 30:
 					break
 				else:
 					test += 1
 					continue
 
-			if self.sample['audio']:
-				sample = self.sample['audio'].pop(0)
+			if self.sample['audio']['sample']:
+				sample = self.sample['audio']['sample'].pop(0)
 				offset = sample['chunk_offset']
 				size = sample['sample_size']
 				data = self._ADTS(self._readFS(FH, offset, size))
@@ -449,6 +493,7 @@ def _hex(byte):
 
 if __name__ == '__main__':
 	#TS('../../BigBuckBunny.mp4')._PES('video', '', 171000, 159750)
+	#TS('../../BigBuckBunny.mp4').segment(0, 10).test()
 	bio = TS('../../BigBuckBunny.mp4').segment(0, 10).ts()
 	while True:
 		s = bio.read(4)

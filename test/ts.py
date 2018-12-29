@@ -82,9 +82,10 @@ def _pes_parser(body, pcr=None):
 			_VDTS = dts
 
 def _ts_parser(head, body):
+	print _hex(head)
+	print _hex(body)
 	body = BytesIO(body)
 	if head[:3] == bytearray([0x47, 0x41, 0x00]):		#Video
-		#print _hex(head)
 		if head[3] >= bytearray([0x30]):				#Has Adaptation Field
 			size = int('{:08b}'.format(int(ord(body.read(1)))), base=2)
 			if size:

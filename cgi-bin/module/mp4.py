@@ -193,13 +193,32 @@ class MP4(object):
 
 	def _sample(self, timeoffset, duration):
 		atom = self.dic()['atom']
+
 		traks = atom['moov']['trak']
 		#sampling
 		sample = {}
 		for trak in traks:
 			type = trak['mdia']['hdlr']['handler-type']
+			stbl = trak['mdia']['minf']['stbl']
+			stsz = stbl['stsz']['entry']
+			stsd = stbl['stsd']['entry'][0]	#Chunk Offset
+			b = 0
+			for t in stsz:
+				b += t['entry_size']
 			out = self._sampling(trak, timeoffset, duration)
+			out = {
+				'sample':out,
+				'info':{
+					'duration':trak['mdia']['mdhd']['duration'],
+					'timescale':trak['mdia']['mdhd']['timescale'],
+					'sample-count':len(stsz),
+					'total-size':b,
+					'type':stsd['type']
+				}
+			}
 			if type == 'vide':
+				out['info']['pps'] = stsd['conf']['pps'][0]
+				out['info']['sps'] = stsd['conf']['sps'][0]
 				sample['video'] = out
 			elif type == 'soun':
 				sample['audio'] = out
@@ -241,6 +260,7 @@ class MP4(object):
 	def _make_sample_keyframe_info(self, stbl):
 		info = []
 		stss = stbl['stss']['entry'] #KeyFrame Info
+
 		for obj in stss:
 			info.append(obj['sample-number'])
 		return info
@@ -285,7 +305,7 @@ class MP4(object):
 					}
 
 					if keyframe:
-						pack['keyframe'] = sample_num in keyframe
+						pack['keyframe'] = sample_num + 1 in keyframe
 
 					sample.append(pack)
 					time += data['delta']
