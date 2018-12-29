@@ -58,7 +58,7 @@ if g:
 		#TODO :TS(fileName).out() convert
 		seq = form.getvalue('seq')
 		sec = form.getvalue('sec')
-		TS(fileName).segment(seq, sec).buffer()
+		#TS(fileName).segment(seq, sec).buffer()
 
 else:
 	data["error"] = "Unknown File"
