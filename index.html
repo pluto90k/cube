@@ -1,11 +1,124 @@
-<html>
-	<body>
-		<H1>VideoCube Media Server</H1>
-		<div>
-				<video width="424" height="240" controls>
-					<!-- <source src="BigBuckBunny.mp4" type="video/mp4">-->
-					<source src="/cgi-bin/cube.py?file=BigBuckBunny.m3u8" type="video/mp4">
-				</video>
-		</div>
-	</body>
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VideoCube Media Server</title>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <style>
+        :root {
+            --primary-color: #6366f1;
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --text-color: #f8fafc;
+        }
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+        .container {
+            width: 90%;
+            max-width: 960px;
+            text-align: center;
+        }
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 800;
+            margin-bottom: 2rem;
+            background: linear-gradient(to right, #818cf8, #c084fc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .video-wrapper {
+            background-color: var(--card-bg);
+            padding: 1rem;
+            border-radius: 1.5rem;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        video {
+            width: 100%;
+            border-radius: 1rem;
+            display: block;
+            outline: none;
+        }
+        .status {
+            margin-top: 1.5rem;
+            font-size: 0.9rem;
+            opacity: 0.7;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>VideoCube Media Server</h1>
+        <div class="video-wrapper">
+            <video id="video" controls playsinline poster="BigBuckBunny.mp4#t=1"></video>
+        </div>
+        <div class="status" id="status">연결 중...</div>
+    </div>
+
+    <script>
+        const video = document.getElementById('video');
+        const status = document.getElementById('status');
+        const videoSrc = '/cgi-bin/cube.py?file=BigBuckBunny.m3u8';
+
+        function initPlayer() {
+            if (Hls.isSupported()) {
+                const hls = new Hls({
+                    debug: true,
+                    enableWorker: true,
+                    lowLatencyMode: true,
+                });
+                hls.loadSource(videoSrc);
+                hls.attachMedia(video);
+                hls.on(Hls.Events.MANIFEST_PARSED, function() {
+                    status.textContent = 'HLS.js를 통해 재생 중';
+                    video.play().catch(e => {
+                        status.textContent = '자동 재생이 차단되었습니다. 재생 버튼을 눌러주세요.';
+                    });
+                });
+                hls.on(Hls.Events.ERROR, function(event, data) {
+                    if (data.fatal) {
+                        const errorMsg = `치명적 오류: ${data.type} (${data.details})`;
+                        status.textContent = errorMsg;
+                        console.error(errorMsg, data);
+                        
+                        switch(data.type) {
+                            case Hls.ErrorTypes.NETWORK_ERROR:
+                                status.textContent += ' - 네트워크를 확인하세요.';
+                                break;
+                            case Hls.ErrorTypes.MEDIA_ERROR:
+                                status.textContent += ' - 미디어를 복구합니다.';
+                                hls.recoverMediaError();
+                                break;
+                            default:
+                                status.textContent += ' - 재생이 중단되었습니다.';
+                                hls.destroy();
+                                break;
+                        }
+                    }
+                });
+            } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                // Safari와 같은 네이티브 HLS 지원 환경용
+                video.src = videoSrc;
+                video.addEventListener('loadedmetadata', function() {
+                    status.textContent = 'Native HLS를 통해 재생 중';
+                    video.play();
+                });
+            } else {
+                status.textContent = '이 브라우저는 HLS 재생을 지원하지 않습니다.';
+            }
+        }
+
+        window.onload = initPlayer;
+    </script>
+</body>
 </html>
